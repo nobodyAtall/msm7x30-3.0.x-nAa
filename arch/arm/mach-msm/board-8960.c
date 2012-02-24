@@ -2107,6 +2107,7 @@ static struct mxt_config_info mxt_config_array_2d[] = {
 		.variant_id	= 0x0,
 		.version	= 0x10,
 		.build		= 0xAA,
+		.bootldr_id	= MXT_BOOTLOADER_ID_1386,
 	},
 	{
 		.config		= mxt1386e_config_data_v1_0,
@@ -2115,6 +2116,7 @@ static struct mxt_config_info mxt_config_array_2d[] = {
 		.variant_id	= 0x2,
 		.version	= 0x10,
 		.build		= 0xAA,
+		.bootldr_id	= MXT_BOOTLOADER_ID_1386E,
 		.fw_name	= "atmel_8960_liquid_v2_1_AA.hex",
 	},
 	{
@@ -2124,6 +2126,7 @@ static struct mxt_config_info mxt_config_array_2d[] = {
 		.variant_id	= 0x7,
 		.version	= 0x21,
 		.build		= 0xAA,
+		.bootldr_id	= MXT_BOOTLOADER_ID_1386E,
 	},
 };
 
