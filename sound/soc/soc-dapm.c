@@ -61,6 +61,7 @@ static int dapm_up_seq[] = {
 	[snd_soc_dapm_micbias] = 2,
 	[snd_soc_dapm_aif_in] = 3,
 	[snd_soc_dapm_aif_out] = 3,
+	[snd_soc_dapm_adc] = 3,
 	[snd_soc_dapm_mic] = 4,
 	[snd_soc_dapm_mux] = 5,
 	[snd_soc_dapm_virt_mux] = 5,
