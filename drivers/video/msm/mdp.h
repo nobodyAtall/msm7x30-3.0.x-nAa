@@ -830,4 +830,5 @@ static inline void mdp_dsi_cmd_overlay_suspend(void)
 }
 #endif
 
+void mdp_vid_quant_set(void);
 #endif /* MDP_H */
