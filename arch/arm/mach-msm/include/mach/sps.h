@@ -233,6 +233,12 @@ enum sps_timer_mode {
 /*   SPS_TIMER_MODE_PERIODIC,    Not supported by hardware yet */
 };
 
+/* This enum indicates the cases when callback the user of BAM */
+enum sps_callback_case {
+	SPS_CALLBACK_BAM_ERROR_IRQ = 1,     /* BAM ERROR IRQ */
+	SPS_CALLBACK_BAM_HRESP_ERR_IRQ,	    /* Erroneous HResponse */
+};
+
 /**
  * This data type corresponds to the native I/O vector (BAM descriptor)
  * supported by SPS hardware
@@ -281,6 +287,9 @@ struct sps_bam_sec_config_props {
  * @periph_phys_addr - Peripheral base physical address, for BAM-DMA only.
  * @periph_virt_addr - Peripheral base virtual address.
  * @periph_virt_size - Size for virtual mapping.
+ *
+ * @callback - callback function for BAM user.
+ * @user - pointer to user data.
  *
  * @event_threshold - Pipe event threshold.
  * @desc_size - Size (bytes) of descriptor FIFO.
@@ -333,6 +342,10 @@ struct sps_bam_props {
 	u32 data_size;
 	u32 desc_mem_id;
 	u32 data_mem_id;
+
+	/* Feedback to BAM user */
+	void (*callback)(enum sps_callback_case, void *);
+	void *user;
 
 	/* Security properties */
 
