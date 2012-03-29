@@ -551,7 +551,12 @@ static u32 vcd_set_property_cmn
 			VCD_MSG_ERROR("Frame delta must be positive");
 			rc = VCD_ERR_ILLEGAL_PARM;
 		   }
+		   break;
 	   }
+	case VCD_REQ_PERF_LEVEL:
+		rc = vcd_req_perf_level(cctxt,
+			(struct vcd_property_perf_level *)prop_val);
+		break;
 	default:
 		{
 			break;
