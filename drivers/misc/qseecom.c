@@ -1115,6 +1115,10 @@ static int qsee_vote_for_clock(void)
 	if (!qsee_perf_client)
 		return -EINVAL;
 
+	/* Check if the clk is valid */
+	if (IS_ERR_OR_NULL(qseecom_bus_clk))
+		return -EINVAL;
+
 	mutex_lock(&qsee_bw_mutex);
 	if (!qsee_bw_count) {
 		ret = msm_bus_scale_client_update_request(
@@ -1139,7 +1143,11 @@ static int qsee_vote_for_clock(void)
 static void qsee_disable_clock_vote(void)
 {
 	if (!qsee_perf_client)
-		return ;
+		return;
+
+	/* Check if the clk is valid */
+	if (IS_ERR_OR_NULL(qseecom_bus_clk))
+		return;
 
 	mutex_lock(&qsee_bw_mutex);
 	if (qsee_bw_count > 0) {
@@ -1343,6 +1351,8 @@ static int qseecom_release(struct inode *inode, struct file *file)
 		mutex_unlock(&pil_access_lock);
 	}
 	kfree(data);
+	qsee_disable_clock_vote();
+
 	return ret;
 }
 
@@ -1386,7 +1396,6 @@ static const struct file_operations qseecom_fops = {
 static int __init qseecom_init(void)
 {
 	int rc;
-	int ret = 0;
 	struct device *class_dev;
 	char qsee_not_legacy = 0;
 	uint32_t system_call_id = QSEOS_CHECK_VERSION_CMD;
@@ -1450,20 +1459,18 @@ static int __init qseecom_init(void)
 	}
 
 	/* register client for bus scaling */
-	qsee_perf_client = msm_bus_scale_register_client(&qsee_bus_pdata);
-	if (!qsee_perf_client)
+	qsee_perf_client = msm_bus_scale_register_client(
+					&qsee_bus_pdata);
+	if (!qsee_perf_client) {
 		pr_err("Unable to register bus client\n");
 
-	qseecom_bus_clk = clk_get_sys("scm", "bus_clk");
-	if (!IS_ERR(qseecom_bus_clk)) {
-		ret = clk_set_rate(qseecom_bus_clk, 64000000);
-		if (ret) {
+		qseecom_bus_clk = clk_get(class_dev, "qseecom");
+		if (IS_ERR(qseecom_bus_clk)) {
 			qseecom_bus_clk = NULL;
-			pr_err("Unable to set clock rate\n");
+		} else if (qseecom_bus_clk != NULL) {
+			pr_debug("Enabled DFAB clock");
+			clk_set_rate(qseecom_bus_clk, 64000000);
 		}
-	} else {
-		qseecom_bus_clk = NULL;
-		pr_warn("Unable to get bus clk\n");
 	}
 	return 0;
 err:
