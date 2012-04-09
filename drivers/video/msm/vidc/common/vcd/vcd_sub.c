@@ -17,7 +17,6 @@
 #include "vcd.h"
 #include "vdec_internal.h"
 
-
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MAP_TABLE_SZ 64
 
@@ -2883,6 +2882,30 @@ u32 vcd_set_frame_rate(
 	return rc;
 }
 
+u32 vcd_req_perf_level(
+	struct vcd_clnt_ctxt *cctxt,
+	 struct vcd_property_perf_level *perf_level)
+{
+	u32 rc;
+	u32 res_trk_perf_level;
+	if (!perf_level) {
+		VCD_MSG_ERROR("Invalid parameters\n");
+		return -EINVAL;
+	}
+	res_trk_perf_level = get_res_trk_perf_level(perf_level->level);
+	if (res_trk_perf_level < 0) {
+		rc = -ENOTSUPP;
+		goto perf_level_not_supp;
+	}
+	rc = vcd_set_perf_level(cctxt->dev_ctxt, res_trk_perf_level);
+	if (!rc) {
+		cctxt->reqd_perf_lvl = res_trk_perf_level;
+		cctxt->perf_set_by_client = 1;
+	}
+perf_level_not_supp:
+	return rc;
+}
+
 u32 vcd_set_frame_size(
 	struct vcd_clnt_ctxt *cctxt,
 	 struct vcd_property_frame_size *frm_size)
@@ -2945,13 +2968,15 @@ u32 vcd_calculate_frame_delta(
 	u32 frm_delta;
 	u64 temp, max = ~((u64)0);
 
-	if (frame->time_stamp >= cctxt->status.prev_ts)
+	if (cctxt->time_frame_delta)
+		temp = cctxt->time_frame_delta;
+	else if (frame->time_stamp >= cctxt->status.prev_ts)
 		temp = frame->time_stamp - cctxt->status.prev_ts;
 	else
 		temp = (max - cctxt->status.prev_ts) +
 			frame->time_stamp;
 
-	VCD_MSG_LOW("Curr_ts=%lld  Prev_ts=%lld Diff=%llu",
+	VCD_MSG_LOW("Curr_ts=%lld  Prev_ts=%lld Diff=%llu\n",
 			frame->time_stamp, cctxt->status.prev_ts, temp);
 
 	temp *= cctxt->time_resoln;
