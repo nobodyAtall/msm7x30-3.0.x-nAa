@@ -78,6 +78,7 @@ struct wfd_inst {
 	u32 input_buf_size;
 	u32 out_buf_size;
 	struct list_head input_mem_list;
+	struct wfd_stats stats;
 };
 
 struct wfd_vid_buffer {
@@ -156,6 +157,9 @@ int wfd_allocate_input_buffers(struct wfd_device *wfd_dev,
 			WFD_MSG_ERR("Unable to queue the"
 					" buffer to mdp\n");
 			break;
+		} else {
+			wfd_stats_update(&inst->stats,
+					WFD_STAT_EVENT_MDP_QUEUE);
 		}
 	}
 	rc = v4l2_subdev_call(&wfd_dev->enc_sdev, core, ioctl,
@@ -342,6 +346,9 @@ static int mdp_output_thread(void *data)
 			WFD_MSG_ERR("Either streamoff called or"
 						" MDP REPORTED ERROR\n");
 			break;
+		} else {
+			wfd_stats_update(&inst->stats,
+				WFD_STAT_EVENT_MDP_DEQUEUE);
 		}
 
 		mregion = obuf_mdp.cookie;
@@ -360,8 +367,11 @@ static int mdp_output_thread(void *data)
 			core, ioctl, VSG_Q_BUFFER, (void *)&ibuf_vsg);
 
 		if (rc) {
-			WFD_MSG_ERR("Failed to encode frame\n");
+			WFD_MSG_ERR("Failed to queue frame to vsg\n");
 			break;
+		} else {
+			wfd_stats_update(&inst->stats,
+				WFD_STAT_EVENT_VSG_QUEUE);
 		}
 	}
 	WFD_MSG_DBG("Exiting the thread\n");
@@ -659,9 +669,13 @@ static int wfdioc_qbuf(struct file *filp, void *fh,
 		WFD_MSG_ERR("Failed to register buffer\n");
 		return rc;
 	}
+
 	rc = vb2_qbuf(&inst->vid_bufq, b);
 	if (rc)
 		WFD_MSG_ERR("Failed to queue buffer\n");
+	else
+		wfd_stats_update(&inst->stats, WFD_STAT_EVENT_CLIENT_QUEUE);
+
 	return rc;
 }
 
@@ -720,8 +734,17 @@ static int wfdioc_dqbuf(struct file *filp, void *fh,
 		struct v4l2_buffer *b)
 {
 	struct wfd_inst *inst = filp->private_data;
+	int rc;
+
 	WFD_MSG_INFO("Waiting to dequeue buffer\n");
-	return vb2_dqbuf(&inst->vid_bufq, b, 0);
+	rc = vb2_dqbuf(&inst->vid_bufq, b, 0);
+
+	if (rc)
+		WFD_MSG_ERR("Failed to dequeue buffer\n");
+	else
+		wfd_stats_update(&inst->stats, WFD_STAT_EVENT_CLIENT_DEQUEUE);
+
+	return rc;
 }
 static int wfdioc_g_ctrl(struct file *filp, void *fh,
 					struct v4l2_control *a)
@@ -947,11 +970,15 @@ static void venc_ip_buffer_done(void *cookie, u32 status,
 			ioctl, VSG_RETURN_IP_BUFFER, (void *)&buf);
 	if (rc)
 		WFD_MSG_ERR("Failed to return buffer to vsg\n");
+	else
+		wfd_stats_update(&inst->stats, WFD_STAT_EVENT_ENC_DEQUEUE);
+
 }
 
 static int vsg_release_input_frame(void *cookie, struct vsg_buf_info *buf)
 {
 	struct file *filp = cookie;
+	struct wfd_inst *inst = filp->private_data;
 	struct wfd_device *wfd_dev =
 		(struct wfd_device *)video_drvdata(filp);
 	int rc = 0;
@@ -960,6 +987,10 @@ static int vsg_release_input_frame(void *cookie, struct vsg_buf_info *buf)
 			ioctl, MDP_Q_BUFFER, buf);
 	if (rc)
 		WFD_MSG_ERR("Failed to Q buffer to mdp\n");
+	else {
+		wfd_stats_update(&inst->stats, WFD_STAT_EVENT_MDP_QUEUE);
+		wfd_stats_update(&inst->stats, WFD_STAT_EVENT_VSG_DEQUEUE);
+	}
 
 	return rc;
 }
@@ -967,9 +998,11 @@ static int vsg_release_input_frame(void *cookie, struct vsg_buf_info *buf)
 static int vsg_encode_frame(void *cookie, struct vsg_buf_info *buf)
 {
 	struct file *filp = cookie;
+	struct wfd_inst *inst = filp->private_data;
 	struct wfd_device *wfd_dev =
 		(struct wfd_device *)video_drvdata(filp);
 	struct venc_buf_info venc_buf;
+	int rc = 0;
 
 	if (!buf)
 		return -EINVAL;
@@ -979,8 +1012,15 @@ static int vsg_encode_frame(void *cookie, struct vsg_buf_info *buf)
 		.mregion = buf->mdp_buf_info.cookie
 	};
 
-	return v4l2_subdev_call(&wfd_dev->enc_sdev, core, ioctl,
+	rc = v4l2_subdev_call(&wfd_dev->enc_sdev, core, ioctl,
 			ENCODE_FRAME, &venc_buf);
+
+	if (rc)
+		WFD_MSG_ERR("Encode failed\n");
+	else
+		wfd_stats_update(&inst->stats, WFD_STAT_EVENT_ENC_QUEUE);
+
+	return rc;
 }
 
 void *wfd_vb2_mem_ops_get_userptr(void *alloc_ctx, unsigned long vaddr,
@@ -1037,6 +1077,9 @@ static int wfd_open(struct file *filp)
 	spin_lock_init(&inst->inst_lock);
 	INIT_LIST_HEAD(&inst->input_mem_list);
 	INIT_LIST_HEAD(&inst->minfo_list);
+
+	wfd_stats_init(&inst->stats, MINOR(filp->f_dentry->d_inode->i_rdev));
+
 	rc = v4l2_subdev_call(&wfd_dev->mdp_sdev, core, ioctl, MDP_OPEN,
 				(void *)&inst->mdp_inst);
 	if (rc) {
@@ -1116,6 +1159,8 @@ static int wfd_close(struct file *filp)
 
 		kfree(inst);
 	}
+
+	wfd_stats_deinit(&inst->stats);
 	WFD_MSG_DBG("wfd_close: X\n");
 	return 0;
 }
@@ -1220,6 +1265,13 @@ static int __devinit __wfd_probe(struct platform_device *pdev)
 	}
 	pdev->dev.platform_data = (void *) wfd_dev;
 
+	rc = wfd_stats_setup();
+	if (rc) {
+		WFD_MSG_ERR("No debugfs support: %d\n", rc);
+		/* Don't treat this as a fatal err */
+		rc = 0;
+	}
+
 	for (c = 0; c < WFD_NUM_DEVICES; ++c) {
 		rc = wfd_dev_setup(&wfd_dev[c],
 			WFD_DEVICE_NUMBER_BASE + c, pdev);
@@ -1271,6 +1323,7 @@ static int __devexit __wfd_remove(struct platform_device *pdev)
 		return -ENODEV;
 	}
 
+	wfd_stats_teardown();
 	for (c = 0; c < WFD_NUM_DEVICES; ++c) {
 		v4l2_device_unregister_subdev(&wfd_dev[c].vsg_sdev);
 		v4l2_device_unregister_subdev(&wfd_dev[c].enc_sdev);
