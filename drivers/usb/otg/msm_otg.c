@@ -46,7 +46,7 @@
 #define MSM_USB_BASE	(motg->regs)
 #define DRIVER_NAME	"msm_otg"
 
-#define ID_TIMER_FREQ		(jiffies + msecs_to_jiffies(2000))
+#define ID_TIMER_FREQ		(jiffies + msecs_to_jiffies(500))
 #define ULPI_IO_TIMEOUT_USEC	(10 * 1000)
 
 #define USB_PHY_3P3_VOL_MIN	3050000 /* uV */
