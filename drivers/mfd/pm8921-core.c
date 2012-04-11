@@ -665,6 +665,11 @@ pm8921_add_subdevices(const struct pm8921_platform_data *pdata,
 		goto bail;
 	}
 
+	if (pdata->pwm_pdata) {
+		pwm_cell.platform_data = pdata->pwm_pdata;
+		pwm_cell.pdata_size =
+				sizeof(struct pm8xxx_pwm_platform_data);
+	}
 	ret = mfd_add_devices(pmic->dev, 0, &pwm_cell, 1, NULL, 0);
 	if (ret) {
 		pr_err("Failed to add pwm subdevice ret=%d\n", ret);

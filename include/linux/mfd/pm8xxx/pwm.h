@@ -92,6 +92,14 @@ struct pm8xxx_pwm_duty_cycles {
 };
 
 /**
+ * struct pm8xxx_pwm_platform_data - PWM platform data
+ * dtest_channel - Enable LPG DTEST mode for this LPG channel
+ */
+struct pm8xxx_pwm_platform_data {
+	int dtest_channel;
+};
+
+/**
  * pm8xxx_pwm_config_period - change PWM period
  *
  * @pwm: the PWM device
