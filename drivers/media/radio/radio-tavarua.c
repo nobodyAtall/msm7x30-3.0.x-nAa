@@ -92,6 +92,7 @@ struct tavarua_device {
 	/* synchrnous xfr data */
 	unsigned char sync_xfr_regs[XFR_REG_NUM];
 	struct completion sync_xfr_start;
+	struct completion shutdown_done;
 	struct completion sync_req_done;
 	int tune_req;
 	/* internal register status */
@@ -1073,6 +1074,19 @@ static void read_int_stat(struct work_struct *work)
 	tavarua_handle_interrupts(radio);
 }
 
+static void fm_shutdown(struct work_struct *work)
+{
+	struct tavarua_device *radio = container_of(work,
+					struct tavarua_device, work.work);
+	FMDERR("%s: Releasing the FM I2S GPIO\n", __func__);
+	if (radio->pdata->config_i2s_gpio != NULL)
+		radio->pdata->config_i2s_gpio(FM_I2S_OFF);
+	FMDERR("%s: Shutting down FM SOC\n", __func__);
+	radio->pdata->fm_shutdown(radio->pdata);
+	complete(&radio->shutdown_done);
+}
+
+
 /*************************************************************************
  * irq helper functions
  ************************************************************************/
@@ -1100,9 +1114,6 @@ static int tavarua_request_irq(struct tavarua_device *radio)
    * is limited to ten characters; it is only used for generating the "command"
    * for the kernel thread(s) (which can be seen in ps or top).
    */
-	radio->wqueue  = create_singlethread_workqueue("kfmradio");
-	if (!radio->wqueue)
-		return -ENOMEM;
   /* allocate an interrupt line */
   /* On success, request_irq() returns 0 if everything goes  as
      planned.  Your interrupt handler will start receiving its
@@ -1156,10 +1167,9 @@ static int tavarua_disable_irq(struct tavarua_device *radio)
 		return -EINVAL;
 	irq = radio->pdata->irq;
 	disable_irq_wake(irq);
+	free_irq(irq, radio);
 	cancel_delayed_work_sync(&radio->work);
 	flush_workqueue(radio->wqueue);
-	free_irq(irq, radio);
-	destroy_workqueue(radio->wqueue);
 	return 0;
 }
 
@@ -1805,6 +1815,7 @@ static int tavarua_fops_open(struct file *file)
 	char buffer[] = {0x00, 0x48, 0x8A, 0x8E, 0x97, 0xB7};
 	int bahama_present = -ENODEV;
 
+	INIT_DELAYED_WORK(&radio->work, read_int_stat);
 	if (!atomic_dec_and_test(&radio->users)) {
 		pr_err("%s: Device already in use."
 			"Try again later", __func__);
@@ -2037,10 +2048,7 @@ static int tavarua_fops_release(struct file *file)
 
 	FMDBG("In %s", __func__);
 
-	/* disable radio ctrl */
-	retval = tavarua_write_register(radio, RDCTRL, 0x00);
-
-	FMDBG("%s, Disable IRQs\n", __func__);
+	FMDBG("%s, Disabling the IRQs\n", __func__);
 	/* disable irq */
 	retval = tavarua_disable_irq(radio);
 	if (retval < 0) {
@@ -2048,10 +2056,21 @@ static int tavarua_fops_release(struct file *file)
 		return retval;
 	}
 
+	/* disable radio ctrl */
+	retval = tavarua_write_register(radio, RDCTRL, 0x00);
+	if (retval < 0) {
+		printk(KERN_ERR "%s: failed to disable FM\n", __func__);
+		return retval;
+	}
+
+	init_completion(&radio->shutdown_done);
+
 	bahama_present = is_bahama();
 
 	if (bahama_present == -ENODEV)
 		return -ENODEV;
+
+	INIT_DELAYED_WORK(&radio->work, fm_shutdown);
 
 	if (bahama_present)	{
 		/*Write first sequence of bytes to FM_CTL0*/
@@ -2131,15 +2150,15 @@ static int tavarua_fops_release(struct file *file)
 	}
 exit:
 	FMDBG("%s, Calling fm_shutdown\n", __func__);
+	queue_delayed_work(radio->wqueue, &radio->work,
+				msecs_to_jiffies(TAVARUA_DELAY/2));
 	/* teardown gpio and pmic */
-
 	marimba_set_fm_status(radio->marimba, false);
-	radio->pdata->fm_shutdown(radio->pdata);
-	if (radio->pdata->config_i2s_gpio != NULL)
-		radio->pdata->config_i2s_gpio(FM_I2S_OFF);
+	wait_for_completion(&radio->shutdown_done);
 	radio->handle_irq = 1;
 	atomic_inc(&radio->users);
 	radio->marimba->mod_id = SLAVE_ID_BAHAMA;
+	flush_workqueue(radio->wqueue);
 	return retval;
 }
 
@@ -2980,7 +2999,7 @@ static int tavarua_vidioc_s_ctrl(struct file *file, void *priv,
 		}
 		/* check if off */
 		else if ((ctrl->value == FM_OFF) && radio->registers[RDCTRL]) {
-			FMDBG("turning off...\n");
+			FMDBG("%s: turning off...\n", __func__);
 			tavarua_write_register(radio, RDCTRL, ctrl->value);
 			/* flush the event and work queues */
 			kfifo_reset(&radio->data_buf[TAVARUA_BUF_EVENTS]);
@@ -4028,7 +4047,9 @@ static int  __init tavarua_probe(struct platform_device *pdev)
 	video_set_drvdata(radio->videodev, radio);
     /*Start the worker thread for event handling and register read_int_stat
 	as worker function*/
-	INIT_DELAYED_WORK(&radio->work, read_int_stat);
+	radio->wqueue  = create_singlethread_workqueue("kfmradio");
+	if (!radio->wqueue)
+		return -ENOMEM;
 
 	/* register video device */
 	if (video_register_device(radio->videodev, VFL_TYPE_RADIO, radio_nr)) {
@@ -4067,6 +4088,8 @@ static int __devexit tavarua_remove(struct platform_device *pdev)
 
 	/* disable irq */
 	tavarua_disable_irq(radio);
+
+	destroy_workqueue(radio->wqueue);
 
 	video_unregister_device(radio->videodev);
 
