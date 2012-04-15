@@ -259,6 +259,29 @@ struct tabla_priv {
 #ifdef CONFIG_DEBUG_FS
 struct tabla_priv *debug_tabla_priv;
 #endif
+static unsigned short rx_digital_gain_reg[] = {
+	TABLA_A_CDC_RX1_VOL_CTL_B2_CTL,
+	TABLA_A_CDC_RX2_VOL_CTL_B2_CTL,
+	TABLA_A_CDC_RX3_VOL_CTL_B2_CTL,
+	TABLA_A_CDC_RX4_VOL_CTL_B2_CTL,
+	TABLA_A_CDC_RX5_VOL_CTL_B2_CTL,
+	TABLA_A_CDC_RX6_VOL_CTL_B2_CTL,
+	TABLA_A_CDC_RX7_VOL_CTL_B2_CTL,
+};
+
+
+static unsigned short tx_digital_gain_reg[] = {
+	TABLA_A_CDC_TX1_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX2_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX3_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX4_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX5_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX6_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX7_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX8_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX9_VOL_CTL_GAIN,
+	TABLA_A_CDC_TX10_VOL_CTL_GAIN,
+};
 
 static int tabla_codec_enable_charge_pump(struct snd_soc_dapm_widget *w,
 		struct snd_kcontrol *kcontrol, int event)
@@ -1737,6 +1760,8 @@ static int tabla_codec_enable_dec(struct snd_soc_dapm_widget *w,
 	int ret = 0;
 	u16 dec_reset_reg, tx_vol_ctl_reg, tx_mux_ctl_reg;
 	u8 dec_hpf_cut_of_freq;
+	int offset;
+
 
 	pr_debug("%s %d\n", __func__, event);
 
@@ -1763,11 +1788,13 @@ static int tabla_codec_enable_dec(struct snd_soc_dapm_widget *w,
 	pr_debug("%s(): widget = %s dec_name = %s decimator = %u\n", __func__,
 			w->name, dec_name, decimator);
 
-	if (w->reg == TABLA_A_CDC_CLK_TX_CLK_EN_B1_CTL)
+	if (w->reg == TABLA_A_CDC_CLK_TX_CLK_EN_B1_CTL) {
 		dec_reset_reg = TABLA_A_CDC_CLK_TX_RESET_B1_CTL;
-	else if (w->reg == TABLA_A_CDC_CLK_TX_CLK_EN_B2_CTL)
+		offset = 0;
+	} else if (w->reg == TABLA_A_CDC_CLK_TX_CLK_EN_B2_CTL) {
 		dec_reset_reg = TABLA_A_CDC_CLK_TX_RESET_B2_CTL;
-	else {
+		offset = 8;
+	} else {
 		pr_err("%s: Error, incorrect dec\n", __func__);
 		return -EINVAL;
 	}
@@ -1815,6 +1842,14 @@ static int tabla_codec_enable_dec(struct snd_soc_dapm_widget *w,
 			schedule_delayed_work(&tx_hpf_work[decimator - 1].dwork,
 					msecs_to_jiffies(300));
 		}
+		/* apply the digital gain after the decimator is enabled*/
+		if ((w->shift) < ARRAY_SIZE(rx_digital_gain_reg))
+			snd_soc_write(codec,
+				  tx_digital_gain_reg[w->shift + offset],
+				  snd_soc_read(codec,
+				  tx_digital_gain_reg[w->shift + offset])
+				  );
+
 		break;
 
 	case SND_SOC_DAPM_PRE_PMD:
@@ -1849,6 +1884,15 @@ static int tabla_codec_reset_interpolator(struct snd_soc_dapm_widget *w,
 			1 << w->shift, 1 << w->shift);
 		snd_soc_update_bits(codec, TABLA_A_CDC_CLK_RX_RESET_CTL,
 			1 << w->shift, 0x0);
+		break;
+	case SND_SOC_DAPM_POST_PMU:
+		/* apply the digital gain after the interpolator is enabled*/
+		if ((w->shift) < ARRAY_SIZE(rx_digital_gain_reg))
+			snd_soc_write(codec,
+				  rx_digital_gain_reg[w->shift],
+				  snd_soc_read(codec,
+				  rx_digital_gain_reg[w->shift])
+				  );
 		break;
 	}
 	return 0;
@@ -2206,20 +2250,26 @@ static const struct snd_soc_dapm_widget tabla_dapm_widgets[] = {
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER_E("RX1 MIX1", TABLA_A_CDC_CLK_RX_B1_CTL, 0, 0, NULL,
-		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU),
+		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER_E("RX2 MIX1", TABLA_A_CDC_CLK_RX_B1_CTL, 1, 0, NULL,
-		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU),
+		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER_E("RX3 MIX1", TABLA_A_CDC_CLK_RX_B1_CTL, 2, 0, NULL,
-		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU),
+		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER_E("RX4 MIX1", TABLA_A_CDC_CLK_RX_B1_CTL, 3, 0, NULL,
-		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU),
+		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER_E("RX5 MIX1", TABLA_A_CDC_CLK_RX_B1_CTL, 4, 0, NULL,
-		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU),
+		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER_E("RX6 MIX1", TABLA_A_CDC_CLK_RX_B1_CTL, 5, 0, NULL,
-		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU),
+		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU),
 	SND_SOC_DAPM_MIXER_E("RX7 MIX1", TABLA_A_CDC_CLK_RX_B1_CTL, 6, 0, NULL,
-		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU),
-
+		0, tabla_codec_reset_interpolator, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU),
 
 	SND_SOC_DAPM_MUX_E("RX4 DSM MUX", TABLA_A_CDC_CLK_RX_B1_CTL, 3, 0,
 		&rx4_dsm_mux, tabla_codec_reset_interpolator,
@@ -2800,7 +2850,34 @@ static int tabla_readable(struct snd_soc_codec *ssc, unsigned int reg)
 
 	return tabla_reg_readable[reg];
 }
-
+static bool tabla_is_digital_gain_register(unsigned int reg)
+{
+	bool rtn = false;
+	switch (reg) {
+	case TABLA_A_CDC_RX1_VOL_CTL_B2_CTL:
+	case TABLA_A_CDC_RX2_VOL_CTL_B2_CTL:
+	case TABLA_A_CDC_RX3_VOL_CTL_B2_CTL:
+	case TABLA_A_CDC_RX4_VOL_CTL_B2_CTL:
+	case TABLA_A_CDC_RX5_VOL_CTL_B2_CTL:
+	case TABLA_A_CDC_RX6_VOL_CTL_B2_CTL:
+	case TABLA_A_CDC_RX7_VOL_CTL_B2_CTL:
+	case TABLA_A_CDC_TX1_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX2_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX3_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX4_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX5_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX6_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX7_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX8_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX9_VOL_CTL_GAIN:
+	case TABLA_A_CDC_TX10_VOL_CTL_GAIN:
+		rtn = true;
+		break;
+	default:
+		break;
+	}
+	return rtn;
+}
 static int tabla_volatile(struct snd_soc_codec *ssc, unsigned int reg)
 {
 	/* Registers lower than 0x100 are top level registers which can be
@@ -2813,6 +2890,12 @@ static int tabla_volatile(struct snd_soc_codec *ssc, unsigned int reg)
 	/* IIR Coeff registers are not cacheable */
 	if ((reg >= TABLA_A_CDC_IIR1_COEF_B1_CTL) &&
 		(reg <= TABLA_A_CDC_IIR2_COEF_B5_CTL))
+		return 1;
+
+	/* Digital gain register is not cacheable so we have to write
+	 * the setting even it is the same
+	 */
+	if (tabla_is_digital_gain_register(reg))
 		return 1;
 
 	return 0;
