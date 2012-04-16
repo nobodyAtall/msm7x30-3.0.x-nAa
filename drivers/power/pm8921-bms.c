@@ -16,6 +16,7 @@
 #include <linux/moduleparam.h>
 #include <linux/platform_device.h>
 #include <linux/errno.h>
+#include <linux/power_supply.h>
 #include <linux/mfd/pm8xxx/pm8921-bms.h>
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/mfd/pm8xxx/pm8xxx-adc.h>
@@ -25,8 +26,10 @@
 #include <linux/debugfs.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/mutex.h>
 
 #define BMS_CONTROL		0x224
+#define BMS_S1_DELAY		0x225
 #define BMS_OUTPUT0		0x230
 #define BMS_OUTPUT1		0x231
 #define BMS_TOLERANCES		0x232
@@ -88,6 +91,8 @@ struct pm8921_bms_chip {
 	struct delayed_work	calib_ccadc_work;
 	unsigned int		calib_delay_ms;
 	unsigned int		revision;
+	unsigned int		xoadc_v0625_usb_present;
+	unsigned int		xoadc_v0625_usb_absent;
 	unsigned int		xoadc_v0625;
 	unsigned int		xoadc_v125;
 	unsigned int		batt_temp_channel;
@@ -97,7 +102,7 @@ struct pm8921_bms_chip {
 	unsigned int		batt_id_channel;
 	unsigned int		pmic_bms_irq[PM_BMS_MAX_INTS];
 	DECLARE_BITMAP(enabled_irqs, PM_BMS_MAX_INTS);
-	spinlock_t		bms_output_lock;
+	struct mutex		bms_output_lock;
 	spinlock_t		bms_100_lock;
 	struct single_row_lut	*adjusted_fcc_temp_lut;
 	unsigned int		charging_began;
@@ -114,6 +119,9 @@ static struct pm8921_bms_chip *the_chip;
 #define DEFAULT_RBATT_MOHMS		128
 #define DEFAULT_OCV_MICROVOLTS		3900000
 #define DEFAULT_CHARGE_CYCLES		0
+
+static int last_usb_cal_delta_uv = 1800;
+module_param(last_usb_cal_delta_uv, int, 0644);
 
 static int last_chargecycles = DEFAULT_CHARGE_CYCLES;
 static int last_charge_increase;
@@ -300,6 +308,23 @@ static int pm_bms_masked_write(struct pm8921_bms_chip *chip, u16 addr,
 	return 0;
 }
 
+static int usb_chg_plugged_in(void)
+{
+	union power_supply_propval ret = {0,};
+	static struct power_supply *psy;
+
+	if (psy == NULL) {
+		psy = power_supply_get_by_name("usb");
+		if (psy == NULL)
+			return 0;
+	}
+
+	if (psy->get_property(psy, POWER_SUPPLY_PROP_ONLINE, &ret))
+		return 0;
+
+	return ret.intval;
+}
+
 #define HOLD_OREG_DATA		BIT(1)
 static int pm_bms_lock_output_data(struct pm8921_bms_chip *chip)
 {
@@ -353,14 +378,6 @@ static int pm_bms_read_output_data(struct pm8921_bms_chip *chip, int type,
 		return -EINVAL;
 	}
 
-	/* make sure the bms registers are locked */
-	rc = pm8xxx_readb(chip->dev->parent, BMS_CONTROL, &reg);
-	if (rc) {
-		pr_err("fail to read BMS_OUTPUT0 for type %d rc = %d\n",
-			type, rc);
-		return rc;
-	}
-
 	rc = pm_bms_masked_write(chip, BMS_CONTROL, SELECT_OUTPUT_DATA,
 					type << SELECT_OUTPUT_TYPE_SHIFT);
 	if (rc) {
@@ -402,18 +419,32 @@ static int xoadc_reading_to_microvolt(unsigned int a)
 #define XOADC_CALIB_UV		625000
 #define VBATT_MUL_FACTOR	3
 static int adjust_xo_vbatt_reading(struct pm8921_bms_chip *chip,
-							unsigned int uv)
+					int usb_chg, unsigned int uv)
 {
-	u64 numerator, denominator;
+	s64 numerator, denominator;
+	int local_delta;
 
 	if (uv == 0)
 		return 0;
 
-	numerator = ((u64)uv - chip->xoadc_v0625) * XOADC_CALIB_UV;
-	denominator =  chip->xoadc_v125 - chip->xoadc_v0625;
+	/* dont adjust if not calibrated */
+	if (chip->xoadc_v0625 == 0 || chip->xoadc_v125 == 0) {
+		pr_debug("No cal yet return %d\n", VBATT_MUL_FACTOR * uv);
+		return VBATT_MUL_FACTOR * uv;
+	}
+
+	if (usb_chg)
+		local_delta = last_usb_cal_delta_uv;
+	else
+		local_delta = 0;
+
+	pr_debug("using delta = %d\n", local_delta);
+	numerator = ((s64)uv - chip->xoadc_v0625 - local_delta)
+							* XOADC_CALIB_UV;
+	denominator =  (s64)chip->xoadc_v125 - chip->xoadc_v0625 - local_delta;
 	if (denominator == 0)
 		return uv * VBATT_MUL_FACTOR;
-	return (XOADC_CALIB_UV + div_u64(numerator, denominator))
+	return (XOADC_CALIB_UV + local_delta + div_s64(numerator, denominator))
 						* VBATT_MUL_FACTOR;
 }
 
@@ -480,11 +511,12 @@ static int read_cc(struct pm8921_bms_chip *chip, int *result)
 }
 
 static int convert_vbatt_raw_to_uv(struct pm8921_bms_chip *chip,
+					int usb_chg,
 					uint16_t reading, int *result)
 {
 	*result = xoadc_reading_to_microvolt(reading);
 	pr_debug("raw = %04x vbatt = %u\n", reading, *result);
-	*result = adjust_xo_vbatt_reading(chip, *result);
+	*result = adjust_xo_vbatt_reading(chip, usb_chg, *result);
 	pr_debug("after adj vbatt = %u\n", *result);
 	return 0;
 }
@@ -775,12 +807,61 @@ static int interpolate_pc(struct pm8921_bms_chip *chip,
 	return 100;
 }
 
+#define BMS_MODE_BIT	BIT(6)
+#define EN_VBAT_BIT	BIT(5)
+#define OVERRIDE_MODE_DELAY_MS	20
+int pm8921_bms_get_simultaneous_battery_voltage_and_current(int *ibat_ua,
+								int *vbat_uv)
+{
+	int16_t vsense_raw;
+	int16_t vbat_raw;
+	int vsense_uv;
+	int usb_chg;
+
+	if (the_chip == NULL) {
+		pr_err("Called to early\n");
+		return -EINVAL;
+	}
+
+	mutex_lock(&the_chip->bms_output_lock);
+
+	pm8xxx_writeb(the_chip->dev->parent, BMS_S1_DELAY, 0x00);
+	pm_bms_masked_write(the_chip, BMS_CONTROL,
+			BMS_MODE_BIT | EN_VBAT_BIT, BMS_MODE_BIT | EN_VBAT_BIT);
+
+	msleep(OVERRIDE_MODE_DELAY_MS);
+
+	pm_bms_lock_output_data(the_chip);
+	pm_bms_read_output_data(the_chip, VSENSE_AVG, &vsense_raw);
+	pm_bms_read_output_data(the_chip, VBATT_AVG, &vbat_raw);
+	pm_bms_unlock_output_data(the_chip);
+	pm_bms_masked_write(the_chip, BMS_CONTROL,
+			BMS_MODE_BIT | EN_VBAT_BIT, 0);
+
+	pm8xxx_writeb(the_chip->dev->parent, BMS_S1_DELAY, 0x0B);
+
+	mutex_unlock(&the_chip->bms_output_lock);
+
+	usb_chg = usb_chg_plugged_in();
+
+	convert_vbatt_raw_to_uv(the_chip, usb_chg, vbat_raw, vbat_uv);
+	convert_vsense_to_uv(the_chip, vsense_raw, &vsense_uv);
+	*ibat_ua = vsense_uv * 1000 / (int)the_chip->r_sense;
+
+	pr_debug("vsense_raw = 0x%x vbat_raw = 0x%x"
+			" ibat_ua = %d vbat_uv = %d\n",
+			(uint16_t)vsense_raw, (uint16_t)vbat_raw,
+			*ibat_ua, *vbat_uv);
+	return 0;
+}
+EXPORT_SYMBOL(pm8921_bms_get_simultaneous_battery_voltage_and_current);
+
 static int read_soc_params_raw(struct pm8921_bms_chip *chip,
 				struct pm8921_soc_params *raw)
 {
-	unsigned long flags;
+	int usb_chg;
 
-	spin_lock_irqsave(&chip->bms_output_lock, flags);
+	mutex_lock(&chip->bms_output_lock);
 	pm_bms_lock_output_data(chip);
 
 	pm_bms_read_output_data(chip,
@@ -794,15 +875,16 @@ static int read_soc_params_raw(struct pm8921_bms_chip *chip,
 	read_cc(chip, &raw->cc);
 
 	pm_bms_unlock_output_data(chip);
-	spin_unlock_irqrestore(&chip->bms_output_lock, flags);
+	mutex_unlock(&chip->bms_output_lock);
 
-	convert_vbatt_raw_to_uv(chip,
+	usb_chg = usb_chg_plugged_in();
+	convert_vbatt_raw_to_uv(chip, usb_chg,
 			raw->vbatt_for_rbatt_raw, &raw->vbatt_for_rbatt_uv);
-	convert_vbatt_raw_to_uv(chip,
+	convert_vbatt_raw_to_uv(chip, usb_chg,
 			raw->ocv_for_rbatt_raw, &raw->ocv_for_rbatt_uv);
-	convert_vbatt_raw_to_uv(chip,
+	convert_vbatt_raw_to_uv(chip, usb_chg,
 			raw->last_good_ocv_raw, &raw->last_good_ocv_uv);
-	convert_vsense_to_uv(chip,
+	convert_vbatt_raw_to_uv(chip, usb_chg,
 			raw->vsense_for_rbatt_raw, &raw->vsense_for_rbatt_uv);
 
 	if (raw->last_good_ocv_uv)
@@ -828,9 +910,9 @@ static int calculate_rbatt(struct pm8921_bms_chip *chip,
 {
 	unsigned int  r_batt;
 
-	if (raw->ocv_for_rbatt_uv == 0
-		|| raw->ocv_for_rbatt_uv == raw->vbatt_for_rbatt_uv
-		|| raw->vsense_for_rbatt_raw == 0) {
+	if (raw->ocv_for_rbatt_uv <= 0
+		|| raw->ocv_for_rbatt_uv <= raw->vbatt_for_rbatt_uv
+		|| raw->vsense_for_rbatt_raw <= 0) {
 		pr_debug("rbatt readings unavailable ocv = %d, vbatt = %d,"
 					"vsen = %d\n",
 					raw->ocv_for_rbatt_uv,
@@ -1142,11 +1224,13 @@ static int calculate_state_of_charge(struct pm8921_bms_chip *chip,
 
 	return soc;
 }
-
+#define MIN_DELTA_625_UV	1000
 static void calib_hkadc(struct pm8921_bms_chip *chip)
 {
 	int voltage, rc;
 	struct pm8xxx_adc_chan_result result;
+	int usb_chg;
+	int this_delta;
 
 	rc = pm8xxx_adc_read(the_chip->ref1p25v_channel, &result);
 	if (rc) {
@@ -1166,10 +1250,30 @@ static void calib_hkadc(struct pm8921_bms_chip *chip)
 		return;
 	}
 	voltage = xoadc_reading_to_microvolt(result.adc_code);
-	pr_debug("result 0.625V = 0x%x, voltage = %duV adc_meas = %lld\n",
-				result.adc_code, voltage, result.measurement);
+
+	usb_chg = usb_chg_plugged_in();
+	pr_debug("result 0.625V = 0x%x, voltage = %duV adc_meas = %lld "
+				"usb_chg = %d\n",
+				result.adc_code, voltage, result.measurement,
+				usb_chg);
+
+	if (usb_chg)
+		chip->xoadc_v0625_usb_present = voltage;
+	else
+		chip->xoadc_v0625_usb_absent = voltage;
 
 	chip->xoadc_v0625 = voltage;
+	if (chip->xoadc_v0625_usb_present && chip->xoadc_v0625_usb_absent) {
+		this_delta = chip->xoadc_v0625_usb_present
+						- chip->xoadc_v0625_usb_absent;
+		pr_debug("this_delta= %duV\n", this_delta);
+		if (this_delta > MIN_DELTA_625_UV)
+			last_usb_cal_delta_uv = this_delta;
+		pr_debug("625V_present= %d, 625V_absent= %d, delta = %duV\n",
+			chip->xoadc_v0625_usb_present,
+			chip->xoadc_v0625_usb_absent,
+			last_usb_cal_delta_uv);
+	}
 }
 
 static void calibrate_hkadc_work(struct work_struct *work)
@@ -1200,14 +1304,13 @@ static void calibrate_ccadc_work(struct work_struct *work)
 int pm8921_bms_get_vsense_avg(int *result)
 {
 	int rc = -EINVAL;
-	unsigned long flags;
 
 	if (the_chip) {
-		spin_lock_irqsave(&the_chip->bms_output_lock, flags);
+		mutex_lock(&the_chip->bms_output_lock);
 		pm_bms_lock_output_data(the_chip);
 		rc = read_vsense_avg(the_chip, result);
 		pm_bms_unlock_output_data(the_chip);
-		spin_unlock_irqrestore(&the_chip->bms_output_lock, flags);
+		mutex_unlock(&the_chip->bms_output_lock);
 	}
 
 	pr_err("called before initialization\n");
@@ -1217,7 +1320,6 @@ EXPORT_SYMBOL(pm8921_bms_get_vsense_avg);
 
 int pm8921_bms_get_battery_current(int *result_ua)
 {
-	unsigned long flags;
 	int vsense;
 
 	if (!the_chip) {
@@ -1229,15 +1331,15 @@ int pm8921_bms_get_battery_current(int *result_ua)
 		return -EINVAL;
 	}
 
-	spin_lock_irqsave(&the_chip->bms_output_lock, flags);
+	mutex_lock(&the_chip->bms_output_lock);
 	pm_bms_lock_output_data(the_chip);
 	read_vsense_avg(the_chip, &vsense);
 	pm_bms_unlock_output_data(the_chip);
-	spin_unlock_irqrestore(&the_chip->bms_output_lock, flags);
-	pr_debug("vsense=%d\n", vsense);
+	mutex_unlock(&the_chip->bms_output_lock);
+	pr_debug("vsense=%duV\n", vsense);
 	/* cast for signed division */
 	*result_ua = vsense * 1000 / (int)the_chip->r_sense;
-
+	pr_debug("ibat=%duA\n", *result_ua);
 	return 0;
 }
 EXPORT_SYMBOL(pm8921_bms_get_battery_current);
@@ -1555,6 +1657,7 @@ static void check_initial_ocv(struct pm8921_bms_chip *chip)
 {
 	int ocv_uv, rc;
 	int16_t ocv_raw;
+	int usb_chg;
 
 	/*
 	 * Check if a ocv is available in bms hw,
@@ -1563,7 +1666,8 @@ static void check_initial_ocv(struct pm8921_bms_chip *chip)
 	 */
 	ocv_uv = 0;
 	pm_bms_read_output_data(chip, LAST_GOOD_OCV_VALUE, &ocv_raw);
-	rc = convert_vbatt_raw_to_uv(chip, ocv_raw, &ocv_uv);
+	usb_chg = usb_chg_plugged_in();
+	rc = convert_vbatt_raw_to_uv(chip, usb_chg, ocv_raw, &ocv_uv);
 	if (rc || ocv_uv == 0) {
 		rc = adc_based_ocv(chip, &ocv_uv);
 		if (rc) {
@@ -1622,13 +1726,14 @@ static int set_battery_data(struct pm8921_bms_chip *chip)
 	}
 }
 
-enum {
+enum bms_request_operation {
 	CALC_RBATT,
 	CALC_FCC,
 	CALC_PC,
 	CALC_SOC,
 	CALIB_HKADC,
 	CALIB_CCADC,
+	GET_VBAT_VSENSE_SIMULTANEOUS,
 };
 
 static int test_batt_temp = 5;
@@ -1679,6 +1784,7 @@ static int get_calc(void *data, u64 * val)
 {
 	int param = (int)data;
 	int ret = 0;
+	int ibat_ua, vbat_uv;
 	struct pm8921_soc_params raw;
 
 	read_soc_params_raw(the_chip, &raw);
@@ -1711,6 +1817,13 @@ static int get_calc(void *data, u64 * val)
 		/* reading this will trigger calibration */
 		*val = 0;
 		pm8xxx_calib_ccadc();
+		break;
+	case GET_VBAT_VSENSE_SIMULTANEOUS:
+		/* reading this will call simultaneous vbat and vsense */
+		*val =
+		pm8921_bms_get_simultaneous_battery_voltage_and_current(
+			&ibat_ua,
+			&vbat_uv);
 		break;
 	default:
 		ret = -EINVAL;
@@ -1855,6 +1968,9 @@ static void create_debugfs_entries(struct pm8921_bms_chip *chip)
 	debugfs_create_file("calib_ccadc", 0644, chip->dent,
 				(void *)CALIB_CCADC, &calc_fops);
 
+	debugfs_create_file("simultaneous", 0644, chip->dent,
+			(void *)GET_VBAT_VSENSE_SIMULTANEOUS, &calc_fops);
+
 	for (i = 0; i < ARRAY_SIZE(bms_irq_data); i++) {
 		if (chip->pmic_bms_irq[bms_irq_data[i].irq_id])
 			debugfs_create_file(bms_irq_data[i].name, 0444,
@@ -1882,7 +1998,7 @@ static int __devinit pm8921_bms_probe(struct platform_device *pdev)
 		pr_err("Cannot allocate pm_bms_chip\n");
 		return -ENOMEM;
 	}
-	spin_lock_init(&chip->bms_output_lock);
+	mutex_init(&chip->bms_output_lock);
 	spin_lock_init(&chip->bms_100_lock);
 	chip->dev = &pdev->dev;
 	chip->r_sense = pdata->r_sense;
