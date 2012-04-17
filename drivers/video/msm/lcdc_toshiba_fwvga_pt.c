@@ -436,7 +436,7 @@ static int __init lcdc_toshiba_panel_init(void)
 	pinfo->bl_max = 100;
 	pinfo->bl_min = 1;
 
-	if (cpu_is_msm7x25a() || cpu_is_msm7x25aa()) {
+	if (cpu_is_msm7x25a() || cpu_is_msm7x25aa() || cpu_is_msm7x25ab()) {
 		pinfo->yres = 320;
 		pinfo->lcdc.h_back_porch = 10;
 		pinfo->lcdc.h_front_porch = 21;
