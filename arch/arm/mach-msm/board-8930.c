@@ -87,7 +87,7 @@
 #include "pm.h"
 #include <mach/cpuidle.h>
 #include "rpm_resources.h"
-#include "mpm.h"
+#include <mach/mpm.h>
 #include "acpuclock.h"
 #include "rpm_log.h"
 #include "smd_private.h"
