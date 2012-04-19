@@ -94,6 +94,7 @@ struct pm8921_bms_chip {
 	struct pc_temp_ocv_lut	*pc_temp_ocv_lut;
 	struct sf_lut		*pc_sf_lut;
 	struct sf_lut		*rbatt_sf_lut;
+	int			delta_rbatt_mohm;
 	struct work_struct	calib_hkadc_work;
 	struct delayed_work	calib_ccadc_work;
 	unsigned int		calib_delay_ms;
@@ -996,6 +997,13 @@ static int get_rbatt(struct pm8921_bms_chip *chip, int soc_rbatt, int batt_temp)
 	pr_debug("adding rconn_mohm = %d rbatt = %d\n",
 				the_chip->rconn_mohm, rbatt);
 
+	if (is_between(20, 10, soc_rbatt))
+		rbatt = rbatt
+			+ ((20 - soc_rbatt) * chip->delta_rbatt_mohm) / 10;
+	else
+		if (is_between(10, 0, soc_rbatt))
+			rbatt = rbatt + chip->delta_rbatt_mohm;
+
 	pr_debug("RBATT = %d\n", rbatt);
 	return rbatt;
 }
@@ -1596,13 +1604,17 @@ void pm8921_bms_charging_end(int is_battery_full)
 		if (delta_fcc_uah < 0)
 			delta_fcc_uah = -delta_fcc_uah;
 
-		if (delta_fcc_uah * 100  <= (DELTA_FCC_PERCENT * fcc_uah)) {
-			pr_debug("delta_fcc=%d < %d percent of fcc=%d\n",
-				delta_fcc_uah, DELTA_FCC_PERCENT, fcc_uah);
-			last_real_fcc_mah = new_fcc_uah/1000;
-			last_real_fcc_batt_temp = batt_temp;
-			readjust_fcc_table();
-		} else {
+		if (delta_fcc_uah * 100  > (DELTA_FCC_PERCENT * fcc_uah)) {
+			/* new_fcc_uah is outside the scope limit it */
+			if (new_fcc_uah > fcc_uah)
+				new_fcc_uah
+				= (fcc_uah +
+					(DELTA_FCC_PERCENT * fcc_uah) / 100);
+			else
+				new_fcc_uah
+				= (fcc_uah -
+					(DELTA_FCC_PERCENT * fcc_uah) / 100);
+
 			pr_debug("delta_fcc=%d > %d percent of fcc=%d"
 				"will not update real fcc\n",
 				delta_fcc_uah, DELTA_FCC_PERCENT, fcc_uah);
@@ -1952,6 +1964,7 @@ palladium:
 		chip->rbatt_sf_lut = palladium_1500_data.rbatt_sf_lut;
 		chip->default_rbatt_mohm
 				= palladium_1500_data.default_rbatt_mohm;
+		chip->delta_rbatt_mohm = palladium_1500_data.delta_rbatt_mohm;
 		return 0;
 desay:
 		chip->fcc = desay_5200_data.fcc;
@@ -1960,6 +1973,7 @@ desay:
 		chip->pc_sf_lut = desay_5200_data.pc_sf_lut;
 		chip->rbatt_sf_lut = desay_5200_data.rbatt_sf_lut;
 		chip->default_rbatt_mohm = desay_5200_data.default_rbatt_mohm;
+		chip->delta_rbatt_mohm = desay_5200_data.delta_rbatt_mohm;
 		return 0;
 }
 
