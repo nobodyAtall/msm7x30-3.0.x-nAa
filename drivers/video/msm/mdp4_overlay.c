@@ -2262,7 +2262,7 @@ static uint32 mdp4_overlay_get_perf_level(struct mdp_overlay *req,
 	if (mdp4_extn_disp)
 		return OVERLAY_PERF_LEVEL1;
 
-	if (req->flags & MDP_DEINTERLACE)
+	if (req->flags & (MDP_DEINTERLACE | MDP_BACKEND_COMPOSITION))
 		return OVERLAY_PERF_LEVEL1;
 
 	for (i = 0, cnt = 0; i < OVERLAY_PIPE_MAX; i++) {
@@ -2886,18 +2886,20 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		ctrl->mixer0_played++;
 		if (ctrl->panel_mode & MDP4_PANEL_LCDC) {
 			mdp4_overlay_reg_flush(pipe, 0);
-			if (!mfd->use_ov0_blt)
-				mdp4_overlay_update_blt_mode(mfd);
 			mdp4_overlay_lcdc_start();
 			mdp4_overlay_lcdc_vsync_push(mfd, pipe);
+			if (!mfd->use_ov0_blt &&
+					!(pipe->flags & MDP_OV_PLAY_NOWAIT))
+				mdp4_overlay_update_blt_mode(mfd);
 		}
 #ifdef CONFIG_FB_MSM_MIPI_DSI
 		else if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO) {
 			mdp4_overlay_reg_flush(pipe, 0);
-			if (!mfd->use_ov0_blt)
-				mdp4_overlay_update_blt_mode(mfd);
 			mdp4_overlay_dsi_video_start();
 			mdp4_overlay_dsi_video_vsync_push(mfd, pipe);
+			if (!mfd->use_ov0_blt &&
+					!(pipe->flags & MDP_OV_PLAY_NOWAIT))
+				mdp4_overlay_update_blt_mode(mfd);
 		}
 #endif
 		else {
