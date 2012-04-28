@@ -1912,9 +1912,9 @@ static void msm_otg_sm_work(struct work_struct *w)
 			}
 		} else {
 			cancel_delayed_work_sync(&motg->chg_work);
-			msm_otg_notify_charger(motg, 0);
 			motg->chg_state = USB_CHG_STATE_UNDEFINED;
 			motg->chg_type = USB_INVALID_CHARGER;
+			msm_otg_notify_charger(motg, 0);
 			msm_otg_reset(otg);
 			pm_runtime_put_noidle(otg->dev);
 			pm_runtime_suspend(otg->dev);
