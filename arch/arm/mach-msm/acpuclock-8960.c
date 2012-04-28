@@ -743,7 +743,7 @@ static void hfpll_enable(struct scalable *sc)
 
 	if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_msm8627()) {
 		rc = rpm_vreg_set_voltage(sc->vreg[VREG_HFPLL_A].rpm_vreg_id,
-				sc->vreg[VREG_HFPLL_A].rpm_vreg_voter, 2100000,
+				sc->vreg[VREG_HFPLL_A].rpm_vreg_voter, 2050000,
 				sc->vreg[VREG_HFPLL_A].max_vdd, 0);
 		if (rc)
 			pr_err("%s regulator enable failed (%d)\n",
