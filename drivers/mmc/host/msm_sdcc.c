@@ -2784,6 +2784,20 @@ static void msmsdcc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 }
 
 #ifdef CONFIG_PM_RUNTIME
+static void msmsdcc_print_rpm_info(struct msmsdcc_host *host)
+{
+	struct device *dev = mmc_dev(host->mmc);
+
+	pr_info("%s: RPM: runtime_status=%d, usage_count=%d,"
+		" is_suspended=%d, disable_depth=%d, runtime_error=%d,"
+		" request_pending=%d, request=%d\n",
+		mmc_hostname(host->mmc), dev->power.runtime_status,
+		atomic_read(&dev->power.usage_count),
+		dev->power.is_suspended, dev->power.disable_depth,
+		dev->power.runtime_error, dev->power.request_pending,
+		dev->power.request);
+}
+
 static int msmsdcc_enable(struct mmc_host *mmc)
 {
 	int rc;
@@ -2807,6 +2821,7 @@ static int msmsdcc_enable(struct mmc_host *mmc)
 	if (rc < 0) {
 		pr_info("%s: %s: failed with error %d", mmc_hostname(mmc),
 				__func__, rc);
+		msmsdcc_print_rpm_info(host);
 		return rc;
 	}
 
@@ -2830,15 +2845,19 @@ static int msmsdcc_disable(struct mmc_host *mmc, int lazy)
 
 	rc = pm_runtime_put_sync(mmc->parent);
 
-	if (rc < 0)
+	if (rc < 0) {
 		pr_info("%s: %s: failed with error %d", mmc_hostname(mmc),
 				__func__, rc);
-	else
+		msmsdcc_print_rpm_info(host);
+	} else {
 		host->is_resumed = false;
+	}
 
 	return rc;
 }
 #else
+static void msmsdcc_print_rpm_info(struct msmsdcc_host *host) {}
+
 static int msmsdcc_enable(struct mmc_host *mmc)
 {
 	struct msmsdcc_host *host = mmc_priv(mmc);
@@ -4061,7 +4080,7 @@ static void msmsdcc_dump_sdcc_state(struct msmsdcc_host *host)
 				mmc_hostname(host->mmc), host->dma.busy,
 				host->dma.channel, host->dma.crci);
 		else if (host->is_sps_mode) {
-			if (host->sps.busy)
+			if (host->sps.busy && host->clks_on)
 				msmsdcc_print_regs("SDCC-DML", host->dml_base,
 						   host->dml_memres->start,
 						   16);
@@ -4079,6 +4098,7 @@ static void msmsdcc_dump_sdcc_state(struct msmsdcc_host *host)
 		mmc_hostname(host->mmc), host->curr.got_dataend,
 		host->prog_enable, host->curr.wait_for_auto_prog_done,
 		host->curr.got_auto_prog_done);
+	msmsdcc_print_rpm_info(host);
 }
 
 static void msmsdcc_req_tout_timer_hdlr(unsigned long data)
