@@ -1672,13 +1672,11 @@ msmsdcc_irq(int irq, void *dev_id)
 		msmsdcc_print_status(host, "irq0-p", status);
 #endif
 
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 		if (status & MCI_SDIOINTROPE) {
 			if (host->sdcc_suspending)
 				wake_lock(&host->sdio_suspend_wlock);
 			mmc_signal_sdio_irq(host->mmc);
 		}
-#endif
 		data = host->curr.data;
 
 		if (host->dummy_52_sent) {
@@ -2724,7 +2722,6 @@ static int msmsdcc_get_ro(struct mmc_host *mmc)
 	return status;
 }
 
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 static void msmsdcc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 {
 	struct msmsdcc_host *host = mmc_priv(mmc);
@@ -2754,7 +2751,6 @@ static void msmsdcc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 		}
 	}
 }
-#endif /* CONFIG_MMC_MSM_SDIO_SUPPORT */
 
 #ifdef CONFIG_PM_RUNTIME
 static int msmsdcc_enable(struct mmc_host *mmc)
@@ -3387,9 +3383,7 @@ static const struct mmc_host_ops msmsdcc_ops = {
 	.request	= msmsdcc_request,
 	.set_ios	= msmsdcc_set_ios,
 	.get_ro		= msmsdcc_get_ro,
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 	.enable_sdio_irq = msmsdcc_enable_sdio_irq,
-#endif
 	.start_signal_voltage_switch = msmsdcc_start_signal_voltage_switch,
 	.execute_tuning = msmsdcc_execute_tuning
 };
@@ -4515,9 +4509,7 @@ msmsdcc_probe(struct platform_device *pdev)
 
 	if (plat->nonremovable)
 		mmc->caps |= MMC_CAP_NONREMOVABLE;
-#ifdef CONFIG_MMC_MSM_SDIO_SUPPORT
 	mmc->caps |= MMC_CAP_SDIO_IRQ;
-#endif
 
 	if (plat->is_sdio_al_client)
 		mmc->pm_flags |= MMC_PM_IGNORE_PM_NOTIFY;
