@@ -572,6 +572,9 @@ static int msm_otg_reset(struct otg_transceiver *otg)
 		writel_relaxed(val, USB_OTGSC);
 		ulpi_write(otg, ulpi_val, ULPI_USB_INT_EN_RISE);
 		ulpi_write(otg, ulpi_val, ULPI_USB_INT_EN_FALL);
+	} else if (pdata->otg_control == OTG_PMIC_CONTROL) {
+		ulpi_write(otg, OTG_COMP_DISABLE,
+			ULPI_SET(ULPI_PWR_CLK_MNG_REG));
 	}
 
 	return 0;
@@ -644,15 +647,6 @@ static int msm_otg_suspend(struct msm_otg *motg)
 		ulpi_write(otg, 0x08, 0x09);
 	}
 
-	/*
-	 * Turn off the OTG comparators, if depends on PMIC for
-	 * VBUS and ID notifications.
-	 */
-	if ((motg->caps & ALLOW_PHY_COMP_DISABLE) && !host_bus_suspend) {
-		ulpi_write(otg, OTG_COMP_DISABLE,
-			ULPI_SET(ULPI_PWR_CLK_MNG_REG));
-		motg->lpm_flags |= PHY_OTG_COMP_DISABLED;
-	}
 
 	/* Set the PHCD bit, only if it is not set by the controller.
 	 * PHY may take some time or even fail to enter into low power
@@ -826,12 +820,6 @@ static int msm_otg_resume(struct msm_otg *motg)
 	}
 
 skip_phy_resume:
-	/* Turn on the OTG comparators on resume */
-	if (motg->lpm_flags & PHY_OTG_COMP_DISABLED) {
-		ulpi_write(otg, OTG_COMP_DISABLE,
-			ULPI_CLR(ULPI_PWR_CLK_MNG_REG));
-		motg->lpm_flags &= ~PHY_OTG_COMP_DISABLED;
-	}
 	if (device_may_wakeup(otg->dev)) {
 		disable_irq_wake(motg->irq);
 		if (motg->pdata->pmic_id_irq)
@@ -969,6 +957,10 @@ static void msm_otg_start_host(struct otg_transceiver *otg, int on)
 	if (on) {
 		dev_dbg(otg->dev, "host on\n");
 
+		if (pdata->otg_control == OTG_PHY_CONTROL)
+			ulpi_write(otg, OTG_COMP_DISABLE,
+				ULPI_SET(ULPI_PWR_CLK_MNG_REG));
+
 		/*
 		 * Some boards have a switch cotrolled by gpio
 		 * to enable/disable internal HUB. Enable internal
@@ -986,6 +978,10 @@ static void msm_otg_start_host(struct otg_transceiver *otg, int on)
 
 		if (pdata->setup_gpio)
 			pdata->setup_gpio(OTG_STATE_UNDEFINED);
+
+		if (pdata->otg_control == OTG_PHY_CONTROL)
+			ulpi_write(otg, OTG_COMP_DISABLE,
+				ULPI_CLR(ULPI_PWR_CLK_MNG_REG));
 	}
 }
 
@@ -2718,8 +2714,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 			(!(motg->pdata->mode == USB_OTG) ||
 			 motg->pdata->pmic_id_irq))
 			motg->caps = ALLOW_PHY_POWER_COLLAPSE |
-				ALLOW_PHY_RETENTION |
-				ALLOW_PHY_COMP_DISABLE;
+				ALLOW_PHY_RETENTION;
 
 		if (motg->pdata->otg_control == OTG_PHY_CONTROL)
 			motg->caps = ALLOW_PHY_RETENTION;
