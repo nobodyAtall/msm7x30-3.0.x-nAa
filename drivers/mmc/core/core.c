@@ -106,12 +106,12 @@ void mmc_request_done(struct mmc_host *host, struct mmc_request *mrq)
 	}
 
 	if (err && cmd->retries && !mmc_card_removed(host->card)) {
-		pr_debug("%s: req failed (CMD%u): %d, retrying...\n",
-			mmc_hostname(host), cmd->opcode, err);
-
-		cmd->retries--;
-		cmd->error = 0;
-		host->ops->request(host, mrq);
+		/*
+		 * Request starter must handle retries - see
+		 * mmc_wait_for_req().
+		 */
+		if (mrq->done)
+			mrq->done(mrq);
 	} else {
 		led_trigger_event(host->led, LED_OFF);
 
@@ -250,7 +250,21 @@ void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 
 	mmc_start_request(host, mrq);
 
-	wait_for_completion_io(&complete);
+	while (1) {
+		struct mmc_command *cmd;
+
+		wait_for_completion_io(&complete);
+
+		cmd = mrq->cmd;
+		if (!cmd->error || !cmd->retries)
+			break;
+
+		pr_debug("%s: req failed (CMD%u): %d, retrying...\n",
+			 mmc_hostname(host), cmd->opcode, cmd->error);
+		cmd->retries--;
+		cmd->error = 0;
+		host->ops->request(host, mrq);
+	}
 }
 
 EXPORT_SYMBOL(mmc_wait_for_req);
