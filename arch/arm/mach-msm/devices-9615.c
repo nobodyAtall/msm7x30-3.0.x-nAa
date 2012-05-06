@@ -31,7 +31,7 @@
 #include <mach/msm_sps.h>
 #include <mach/dma.h>
 #include "devices.h"
-#include "mpm.h"
+#include <mach/mpm.h>
 #include "spm.h"
 #include "pm.h"
 #include "rpm_resources.h"
