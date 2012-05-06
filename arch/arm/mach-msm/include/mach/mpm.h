@@ -17,13 +17,6 @@
 #include <linux/types.h>
 #include <linux/list.h>
 
-enum msm_mpm_pin {
-	MSM_MPM_PIN_SDC3_DAT1 = 21,
-	MSM_MPM_PIN_SDC3_DAT3 = 22,
-	MSM_MPM_PIN_SDC4_DAT1 = 23,
-	MSM_MPM_PIN_SDC4_DAT3 = 24,
-};
-
 #define MSM_MPM_NR_MPM_IRQS  64
 
 struct msm_mpm_device_data {
@@ -41,35 +34,35 @@ struct msm_mpm_device_data {
 #ifdef CONFIG_MSM_MPM
 extern struct msm_mpm_device_data msm_mpm_dev_data;
 
-int msm_mpm_enable_pin(enum msm_mpm_pin pin, unsigned int enable);
-int msm_mpm_set_pin_wake(enum msm_mpm_pin pin, unsigned int on);
-int msm_mpm_set_pin_type(enum msm_mpm_pin pin, unsigned int flow_type);
+int msm_mpm_enable_pin(unsigned int pin, unsigned int enable);
+int msm_mpm_set_pin_wake(unsigned int pin, unsigned int on);
+int msm_mpm_set_pin_type(unsigned int pin, unsigned int flow_type);
 bool msm_mpm_irqs_detectable(bool from_idle);
 bool msm_mpm_gpio_irqs_detectable(bool from_idle);
 void msm_mpm_enter_sleep(bool from_idle);
 void msm_mpm_exit_sleep(bool from_idle);
 void msm_mpm_irq_extn_init(void);
 #else
-
-int msm_mpm_enable_irq(unsigned int irq, unsigned int enable)
+static inline int msm_mpm_enable_irq(unsigned int irq, unsigned int enable)
 { return -ENODEV; }
-int msm_mpm_set_irq_wake(unsigned int irq, unsigned int on)
+static inline int msm_mpm_set_irq_wake(unsigned int irq, unsigned int on)
 { return -ENODEV; }
-int msm_mpm_set_irq_type(unsigned int irq, unsigned int flow_type)
+static inline int msm_mpm_set_irq_type(unsigned int irq, unsigned int flow_type)
 { return -ENODEV; }
-int msm_mpm_enable_pin(enum msm_mpm_pin pin, unsigned int enable)
+static inline int msm_mpm_enable_pin(unsigned int pin, unsigned int enable)
 { return -ENODEV; }
-int msm_mpm_set_pin_wake(enum msm_mpm_pin pin, unsigned int on)
+static inline int msm_mpm_set_pin_wake(unsigned int pin, unsigned int on)
 { return -ENODEV; }
-int msm_mpm_set_pin_type(enum msm_mpm_pin pin, unsigned int flow_type)
+static inline int msm_mpm_set_pin_type(unsigned int pin,
+				       unsigned int flow_type)
 { return -ENODEV; }
-bool msm_mpm_irqs_detectable(bool from_idle)
+static inline bool msm_mpm_irqs_detectable(bool from_idle)
 { return false; }
-bool msm_mpm_gpio_irqs_detectable(bool from_idle)
+static inline bool msm_mpm_gpio_irqs_detectable(bool from_idle)
 { return false; }
-void msm_mpm_enter_sleep(bool from_idle) {}
-void msm_mpm_exit_sleep(bool from_idle) {}
-void msm_mpm_irq_extn_init(void) {}
+static inline void msm_mpm_enter_sleep(bool from_idle) {}
+static inline void msm_mpm_exit_sleep(bool from_idle) {}
+static inline void msm_mpm_irq_extn_init(void) {}
 #endif
 
 
