@@ -73,6 +73,12 @@ enum pm8xxx_pon_config {
 	PM8XXX_RESTART_ON_HARD_RESET,
 };
 
+enum pm8xxx_hsed_bias {
+	PM8XXX_HSED_BIAS0,
+	PM8XXX_HSED_BIAS1,
+	PM8XXX_HSED_BIAS2,
+};
+
 #if defined(CONFIG_MFD_PM8XXX_MISC) || defined(CONFIG_MFD_PM8XXX_MISC_MODULE)
 
 /**
@@ -172,6 +178,14 @@ int pm8xxx_stay_on(void);
  */
 int pm8xxx_preload_dVdd(void);
 
+/**
+ * pm8xxx_hsed_bias_control - Control the HSED_BIAS signal
+ * @bias: the bias line to be controlled (of the 3)
+ * @enable: enable/disable the bias line
+ *
+ * RETURNS: an appropriate -ERRNO error value on error, or zero for success.
+ */
+int pm8xxx_hsed_bias_control(enum pm8xxx_hsed_bias bias, bool enable);
 #else
 
 static inline int pm8xxx_reset_pwr_off(int reset)
@@ -212,6 +226,12 @@ static inline int pm8xxx_preload_dVdd(void)
 {
 	return -ENODEV;
 }
+static inline int pm8xxx_hsed_bias_control(enum pm8xxx_hsed_bias bias,
+							bool enable)
+{
+	return -ENODEV;
+}
+
 #endif
 
 #endif
