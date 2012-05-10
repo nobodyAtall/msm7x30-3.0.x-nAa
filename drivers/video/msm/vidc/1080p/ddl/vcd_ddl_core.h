@@ -132,4 +132,6 @@
 #define DDL_RESL_CHANGE_INCREASED               1
 #define DDL_RESL_CHANGE_DECREASED               2
 
+#define GRAPHICS_UNUSED_BUFFERS		2
+
 #endif
