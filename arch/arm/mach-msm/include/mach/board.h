@@ -447,6 +447,7 @@ struct msm_vidc_platform_data {
 	struct msm_bus_scale_pdata *vidc_bus_client_pdata;
 #endif
 	int cont_mode_dpb_count;
+	int disable_turbo;
 };
 
 #if defined(CONFIG_USB_PEHCI_HCD) || defined(CONFIG_USB_PEHCI_HCD_MODULE)
