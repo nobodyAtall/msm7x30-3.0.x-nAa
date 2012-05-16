@@ -1288,13 +1288,15 @@ static int __cpuinit acpuclock_cpu_callback(struct notifier_block *nfb,
 	case CPU_DYING:
 	case CPU_DYING_FROZEN:
 		/*
-		 * The primary and secondary muxes must be set to QSB before L2
-		 * power collapse and restored after.
+		 * On Krait v1, the primary and secondary muxes must be set
+		 * to QSB before L2 power collapse and restored after.
 		 */
-		prev_sec_src[cpu] = get_sec_clk_src(&scalable[cpu]);
-		prev_pri_src[cpu] = get_pri_clk_src(&scalable[cpu]);
-		set_sec_clk_src(&scalable[cpu], SEC_SRC_SEL_QSB);
-		set_pri_clk_src(&scalable[cpu], PRI_SRC_SEL_SEC_SRC);
+		if (cpu_is_krait_v1()) {
+			prev_sec_src[cpu] = get_sec_clk_src(&scalable[cpu]);
+			prev_pri_src[cpu] = get_pri_clk_src(&scalable[cpu]);
+			set_sec_clk_src(&scalable[cpu], SEC_SRC_SEL_QSB);
+			set_pri_clk_src(&scalable[cpu], PRI_SRC_SEL_SEC_SRC);
+		}
 		break;
 	case CPU_DEAD:
 	case CPU_DEAD_FROZEN:
@@ -1312,8 +1314,10 @@ static int __cpuinit acpuclock_cpu_callback(struct notifier_block *nfb,
 		break;
 	case CPU_STARTING:
 	case CPU_STARTING_FROZEN:
-		set_sec_clk_src(&scalable[cpu], prev_sec_src[cpu]);
-		set_pri_clk_src(&scalable[cpu], prev_pri_src[cpu]);
+		if (cpu_is_krait_v1()) {
+			set_sec_clk_src(&scalable[cpu], prev_sec_src[cpu]);
+			set_pri_clk_src(&scalable[cpu], prev_pri_src[cpu]);
+		}
 		break;
 	default:
 		break;
