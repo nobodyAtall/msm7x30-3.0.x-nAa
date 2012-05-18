@@ -631,6 +631,83 @@ static struct msm_gpiomux_config msm8960_hdmi_configs[] __initdata = {
 };
 #endif
 
+#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+static struct gpiomux_setting sdcc2_clk_actv_cfg = {
+	.func = GPIOMUX_FUNC_2,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_NONE,
+};
+
+static struct gpiomux_setting sdcc2_cmd_data_0_3_actv_cfg = {
+	.func = GPIOMUX_FUNC_2,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+
+static struct gpiomux_setting sdcc2_suspend_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+};
+
+static struct gpiomux_setting sdcc2_data_1_suspend_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_8MA,
+	.pull = GPIOMUX_PULL_UP,
+};
+
+static struct msm_gpiomux_config msm8960_sdcc2_configs[] __initdata = {
+	{
+		/* DATA_3 */
+		.gpio      = 92,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &sdcc2_cmd_data_0_3_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &sdcc2_suspend_cfg,
+		},
+	},
+	{
+		/* DATA_2 */
+		.gpio      = 91,
+		.settings = {
+		[GPIOMUX_ACTIVE]    = &sdcc2_cmd_data_0_3_actv_cfg,
+		[GPIOMUX_SUSPENDED] = &sdcc2_suspend_cfg,
+		},
+	},
+	{
+		/* DATA_1 */
+		.gpio      = 90,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &sdcc2_cmd_data_0_3_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &sdcc2_data_1_suspend_cfg,
+		},
+	},
+	{
+		/* DATA_0 */
+		.gpio      = 89,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &sdcc2_cmd_data_0_3_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &sdcc2_suspend_cfg,
+		},
+	},
+	{
+		/* CMD */
+		.gpio      = 97,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &sdcc2_cmd_data_0_3_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &sdcc2_suspend_cfg,
+		},
+	},
+	{
+		/* CLK */
+		.gpio      = 98,
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &sdcc2_clk_actv_cfg,
+			[GPIOMUX_SUSPENDED] = &sdcc2_suspend_cfg,
+		},
+	},
+};
+#endif
+
 int __init msm8960_init_gpiomux(void)
 {
 	int rc = msm_gpiomux_init(NR_GPIO_IRQS);
@@ -685,6 +762,11 @@ int __init msm8960_init_gpiomux(void)
 
 	msm_gpiomux_install(msm8960_mdp_vsync_configs,
 			ARRAY_SIZE(msm8960_mdp_vsync_configs));
+
+#ifdef CONFIG_MMC_MSM_SDC2_SUPPORT
+	msm_gpiomux_install(msm8960_sdcc2_configs,
+		ARRAY_SIZE(msm8960_sdcc2_configs));
+#endif
 
 	return 0;
 }
