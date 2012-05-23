@@ -941,8 +941,6 @@ static int msmsdcc_sps_start_xfer(struct msmsdcc_host *host,
 	if (rc != data->sg_len) {
 		pr_err("%s: Unable to map in all sg elements, rc=%d\n",
 		       mmc_hostname(host->mmc), rc);
-		host->sps.sg = NULL;
-		host->sps.num_ents = 0;
 		rc = -ENOMEM;
 		goto dma_map_err;
 	}
@@ -990,6 +988,8 @@ dma_map_err:
 	/* unmap sg buffers */
 	dma_unmap_sg(mmc_dev(host->mmc), host->sps.sg, host->sps.num_ents,
 			host->sps.dir);
+	host->sps.sg = NULL;
+	host->sps.num_ents = 0;
 out:
 	return rc;
 }
