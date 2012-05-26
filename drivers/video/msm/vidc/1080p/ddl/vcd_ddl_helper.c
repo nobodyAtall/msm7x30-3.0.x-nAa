@@ -979,8 +979,9 @@ u32 ddl_check_reconfig(struct ddl_client_context *ddl)
 	if (decoder->cont_mode) {
 		if ((decoder->actual_output_buf_req.sz <=
 			 decoder->client_output_buf_req.sz) &&
-			(decoder->actual_output_buf_req.actual_count <=
-			 decoder->client_output_buf_req.actual_count)) {
+			(decoder->actual_output_buf_req.actual_count +
+                        GRAPHICS_UNUSED_BUFFERS <=
+                        decoder->client_output_buf_req.actual_count)) {
 			need_reconfig = false;
 			if (decoder->min_dpb_num >
 				decoder->min_output_buf_req.min_count) {
