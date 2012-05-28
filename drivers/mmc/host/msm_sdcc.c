@@ -365,8 +365,8 @@ msmsdcc_stop_data(struct msmsdcc_host *host)
 {
 	host->curr.data = NULL;
 	host->curr.got_dataend = 0;
-	host->curr.wait_for_auto_prog_done = 0;
-	host->curr.got_auto_prog_done = 0;
+	host->curr.wait_for_auto_prog_done = false;
+	host->curr.got_auto_prog_done = false;
 	writel_relaxed(readl_relaxed(host->base + MMCIDATACTRL) &
 			(~(MCI_DPSM_ENABLE)), host->base + MMCIDATACTRL);
 	msmsdcc_sync_reg_wr(host); /* Allow the DPSM to be reset */
@@ -1077,7 +1077,7 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 	host->curr.xfer_remain = host->curr.xfer_size;
 	host->curr.data_xfered = 0;
 	host->curr.got_dataend = 0;
-	host->curr.got_auto_prog_done = 0;
+	host->curr.got_auto_prog_done = false;
 
 	datactrl = MCI_DPSM_ENABLE | (data->blksz << 4);
 
@@ -1600,7 +1600,7 @@ static void msmsdcc_do_cmdirq(struct msmsdcc_host *host, uint32_t status)
 					host->curr.cmd = cmd;
 			} else {
 				host->prog_enable = 0;
-				host->curr.wait_for_auto_prog_done = 0;
+				host->curr.wait_for_auto_prog_done = false;
 				if (host->dummy_52_needed)
 					host->dummy_52_needed = 0;
 				if (cmd->data && cmd->error)
@@ -1767,7 +1767,7 @@ msmsdcc_irq(int irq, void *dev_id)
 			/* Check for prog done */
 			if (host->curr.wait_for_auto_prog_done &&
 				(status & MCI_PROGDONE))
-				host->curr.got_auto_prog_done = 1;
+				host->curr.got_auto_prog_done = true;
 
 			/* Check for data done */
 			if (!host->curr.got_dataend && (status & MCI_DATAEND))
@@ -1917,35 +1917,27 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 			 msecs_to_jiffies(host->curr.req_tout_ms)));
 
 	host->curr.mrq = mrq;
+	if (mrq->sbc) {
+		mrq->sbc->mrq = mrq;
+		mrq->sbc->data = mrq->data;
+	}
+
 	if (mrq->data && (mrq->data->flags & MMC_DATA_WRITE)) {
-		if (mrq->cmd->opcode == SD_IO_RW_EXTENDED ||
-			mrq->cmd->opcode == 54) {
-			if (!host->sdcc_version)
+		if (host->sdcc_version) {
+			if (!mrq->stop)
+				host->curr.wait_for_auto_prog_done = true;
+		} else {
+			if ((mrq->cmd->opcode == SD_IO_RW_EXTENDED) ||
+			    (mrq->cmd->opcode == 54))
 				host->dummy_52_needed = 1;
-			else
-				/*
-				 * SDCCv4 supports AUTO_PROG_DONE bit for SDIO
-				 * write operations using CMD53 and CMD54.
-				 * Setting this bit with CMD53 would
-				 * automatically triggers PROG_DONE interrupt
-				 * without the need of sending dummy CMD52.
-				 */
-				host->curr.wait_for_auto_prog_done = 1;
-		} else if (mrq->cmd->opcode == MMC_WRITE_BLOCK &&
-				host->sdcc_version) {
-			host->curr.wait_for_auto_prog_done = 1;
 		}
 	}
 
 	if (mrq->data && mrq->sbc) {
-		mrq->sbc->mrq = mrq;
-		mrq->sbc->data = mrq->data;
-		if (mrq->data->flags & MMC_DATA_WRITE) {
-			host->curr.wait_for_auto_prog_done = 1;
+		if (mrq->data->flags & MMC_DATA_WRITE)
 			msmsdcc_start_command(host, mrq->sbc, 0);
-		} else {
+		else
 			msmsdcc_request_start(host, mrq);
-		}
 	} else {
 		msmsdcc_request_start(host, mrq);
 	}
@@ -4386,7 +4378,7 @@ static void msmsdcc_req_tout_timer_hdlr(unsigned long data)
 			}
 		} else {
 			host->prog_enable = 0;
-			host->curr.wait_for_auto_prog_done = 0;
+			host->curr.wait_for_auto_prog_done = false;
 			msmsdcc_reset_and_restore(host);
 			msmsdcc_request_end(host, mrq);
 		}
