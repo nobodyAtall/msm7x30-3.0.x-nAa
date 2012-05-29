@@ -162,10 +162,11 @@ struct sx150x_platform_data msm8960_sx150x_data[] = {
 #define MSM_LIQUID_ION_SF_SIZE MSM_LIQUID_PMEM_SIZE
 #define MSM_HDMI_PRIM_ION_SF_SIZE MSM_HDMI_PRIM_PMEM_SIZE
 
-#define MSM8960_FIXED_AREA_START 0xb0000000
-#define MAX_FIXED_AREA_SIZE	0x10000000
 #define MSM_MM_FW_SIZE		0x200000
-#define MSM8960_FW_START	(MSM8960_FIXED_AREA_START - MSM_MM_FW_SIZE)
+#define MSM8960_FIXED_AREA_START (0xb0000000 - MSM_MM_FW_SIZE)
+#define MAX_FIXED_AREA_SIZE	0x10000000
+#define MSM8960_FW_START	(MSM8960_FIXED_AREA_START)
+#define HOLE_SIZE		0x100000
 
 static unsigned msm_ion_sf_size = MSM_ION_SF_SIZE;
 #else
@@ -656,14 +657,14 @@ static void __init reserve_ion_memory(void)
 		return;
 
 	if (fmem_pdata.size) {
-		fmem_pdata.reserved_size_low = fixed_low_size;
+		fmem_pdata.reserved_size_low = fixed_low_size + HOLE_SIZE;
 		fmem_pdata.reserved_size_high = fixed_high_size;
 	}
 
-	msm8960_reserve_fixed_area(fixed_size + MSM_MM_FW_SIZE);
+	msm8960_reserve_fixed_area(fixed_size + HOLE_SIZE);
 
 	fixed_low_start = MSM8960_FIXED_AREA_START;
-	fixed_middle_start = fixed_low_start + fixed_low_size;
+	fixed_middle_start = fixed_low_start + fixed_low_size + HOLE_SIZE;
 	fixed_high_start = fixed_middle_start + fixed_middle_size;
 
 	for (i = 0; i < ion_pdata.nr; ++i) {
@@ -671,9 +672,12 @@ static void __init reserve_ion_memory(void)
 
 		if (heap->extra_data) {
 			int fixed_position = NOT_FIXED;
+			struct ion_cp_heap_pdata *pdata;
 
 			switch (heap->type) {
 			case ION_HEAP_TYPE_CP:
+				pdata =
+				(struct ion_cp_heap_pdata *)heap->extra_data;
 				fixed_position = ((struct ion_cp_heap_pdata *)
 					heap->extra_data)->fixed_position;
 				break;
@@ -691,6 +695,9 @@ static void __init reserve_ion_memory(void)
 				break;
 			case FIXED_MIDDLE:
 				heap->base = fixed_middle_start;
+				pdata->secure_base = fixed_middle_start -
+								HOLE_SIZE;
+				pdata->secure_size = HOLE_SIZE + heap->size;
 				break;
 			case FIXED_HIGH:
 				heap->base = fixed_high_start;
