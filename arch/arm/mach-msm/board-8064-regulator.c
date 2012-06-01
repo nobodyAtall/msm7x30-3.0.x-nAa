@@ -51,7 +51,7 @@ VREG_CONSUMERS(L6) = {
 };
 VREG_CONSUMERS(L7) = {
 	REGULATOR_SUPPLY("8921_l7",		NULL),
-	REGULATOR_SUPPLY("sdc_vddp",		"msm_sdcc.3"),
+	REGULATOR_SUPPLY("sdc_vdd_io",		"msm_sdcc.3"),
 };
 VREG_CONSUMERS(L8) = {
 	REGULATOR_SUPPLY("8921_l8",		NULL),
@@ -124,7 +124,7 @@ VREG_CONSUMERS(S3) = {
 };
 VREG_CONSUMERS(S4) = {
 	REGULATOR_SUPPLY("8921_s4",		NULL),
-	REGULATOR_SUPPLY("sdc_vccq",		"msm_sdcc.1"),
+	REGULATOR_SUPPLY("sdc_vdd_io",		"msm_sdcc.1"),
 	REGULATOR_SUPPLY("VDDIO_CDC",		"tabla-slim"),
 	REGULATOR_SUPPLY("CDC_VDD_CP",		"tabla-slim"),
 	REGULATOR_SUPPLY("CDC_VDDA_TX",		"tabla-slim"),
