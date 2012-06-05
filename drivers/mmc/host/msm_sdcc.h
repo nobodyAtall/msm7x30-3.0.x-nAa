@@ -298,6 +298,7 @@ struct msmsdcc_curr_req {
 	int			wait_for_auto_prog_done;
 	int			got_auto_prog_done;
 	int			user_pages;
+	u32			req_tout_ms;
 };
 
 struct msmsdcc_sps_ep_conn_data {
