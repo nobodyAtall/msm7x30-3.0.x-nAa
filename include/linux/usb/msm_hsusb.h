@@ -262,6 +262,7 @@ struct msm_otg {
 #define PHY_PWR_COLLAPSED		BIT(0)
 #define PHY_RETENTIONED			BIT(1)
 	struct pm_qos_request_list pm_qos_req_dma;
+#define XO_SHUTDOWN			BIT(2)
 	int reset_counter;
 };
 
