@@ -100,7 +100,7 @@
 #define MSM_FB_PRIM_BUF_SIZE   (864 * 480 * 4 * 2) /* 4bpp * 2 Pages */
 #endif
 
-#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
+#ifdef CONFIG_FB_MSM_HDMI_ADV7520_PANEL
 #define MSM_FB_EXT_BUF_SIZE (1280 * 720 * 2 * 1) /* 2 bpp x 1 page */
 #else
 #define MSM_FB_EXT_BUF_SIZE    0
