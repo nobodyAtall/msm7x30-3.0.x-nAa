@@ -274,6 +274,10 @@ enum mxt_device_state { INIT, APPMODE, BOOTLOADER };
 #define T7_DATA_SIZE		3
 #define MXT_MAX_RW_TRIES	3
 #define MXT_BLOCK_SIZE		256
+#define MXT_CFG_VERSION_LEN	3
+#define MXT_CFG_VERSION_EQUAL	0
+#define MXT_CFG_VERSION_LESS	1
+#define MXT_CFG_VERSION_GREATER	2
 
 #define MXT_DEBUGFS_DIR		"atmel_mxt_ts"
 #define MXT_DEBUGFS_FILE	"object"
@@ -324,8 +328,6 @@ struct mxt_data {
 	struct mxt_info info;
 	struct mxt_finger finger[MXT_MAX_FINGER];
 	unsigned int irq;
-	unsigned int touch_x_size;
-	unsigned int touch_y_size;
 	struct regulator *vcc_ana;
 	struct regulator *vcc_dig;
 	struct regulator *vcc_i2c;
@@ -335,15 +337,16 @@ struct mxt_data {
 
 	u8 t7_data[T7_DATA_SIZE];
 	u16 t7_start_addr;
-	u8 t9_ctrl;
 	u32 keyarray_old;
 	u32 keyarray_new;
 	u8 t9_max_reportid;
 	u8 t9_min_reportid;
 	u8 t15_max_reportid;
 	u8 t15_min_reportid;
-	u8 curr_cfg_version;
+	u8 cfg_version[MXT_CFG_VERSION_LEN];
 	int cfg_version_idx;
+	int t38_start_addr;
+	bool update_cfg;
 	const char *fw_name;
 };
 
@@ -751,6 +754,17 @@ static void mxt_input_report(struct mxt_data *data, int single_id)
 			continue;
 
 		input_mt_slot(input_dev, id);
+		/* Firmware reports min/max values when the touch is
+		 * outside screen area. Send a release event in
+		 * such cases to avoid unwanted touches.
+		 */
+		if (finger[id].x <= data->pdata->panel_minx ||
+				finger[id].x >= data->pdata->panel_maxx ||
+				finger[id].y <= data->pdata->panel_miny ||
+				finger[id].y >= data->pdata->panel_maxy) {
+			finger[id].status = MXT_RELEASE;
+		}
+
 		input_mt_report_slot_state(input_dev, MT_TOOL_FINGER,
 				finger[id].status != MXT_RELEASE);
 
@@ -763,13 +777,20 @@ static void mxt_input_report(struct mxt_data *data, int single_id)
 			input_report_abs(input_dev, ABS_MT_POSITION_Y,
 					finger[id].y);
 			input_report_abs(input_dev, ABS_MT_PRESSURE,
-					finger[id].area);
+					 finger[id].pressure);
 		} else {
 			finger[id].status = 0;
 		}
 	}
 
 	input_report_key(input_dev, BTN_TOUCH, finger_num > 0);
+
+	if (finger[single_id].x <= data->pdata->panel_minx ||
+		finger[single_id].x >= data->pdata->panel_maxx ||
+		finger[single_id].y <= data->pdata->panel_miny ||
+		finger[single_id].y >= data->pdata->panel_maxy) {
+		status = MXT_RELEASE;
+	}
 
 	if (status != MXT_RELEASE) {
 		input_report_abs(input_dev, ABS_X, finger[single_id].x);
@@ -809,9 +830,9 @@ static void mxt_input_touchevent(struct mxt_data *data,
 
 	x = (message->message[1] << 4) | ((message->message[3] >> 4) & 0xf);
 	y = (message->message[2] << 4) | ((message->message[3] & 0xf));
-	if (data->touch_x_size < 1024)
+	if (data->pdata->panel_maxx < 1024)
 		x = x >> 2;
-	if (data->touch_y_size < 1024)
+	if (data->pdata->panel_maxy < 1024)
 		y = y >> 2;
 
 	area = message->message[4];
@@ -1031,8 +1052,10 @@ static int mxt_get_object_table(struct mxt_data *data)
 		/* Calculate index for config major version in config array.
 		 * Major version is the first byte in object T38.
 		 */
-		if (object->type == MXT_SPT_USERDATA_T38)
+		if (object->type == MXT_SPT_USERDATA_T38) {
+			data->t38_start_addr = object->start_address;
 			found_t38 = true;
+		}
 		if (!found_t38 && mxt_object_writable(object->type))
 			data->cfg_version_idx += object->size + 1;
 	}
@@ -1040,14 +1063,85 @@ static int mxt_get_object_table(struct mxt_data *data)
 	return 0;
 }
 
-static int mxt_search_config_array(struct mxt_data *data, bool version_match)
+static int compare_versions(const u8 *v1, const u8 *v2)
+{
+	int i;
+
+	if (!v1 || !v2)
+		return -EINVAL;
+
+	/* The major version number stays the same across different versions for
+	 * a particular controller on a target. The minor and sub-minor version
+	 * numbers indicate which version is newer.
+	 */
+	if (v1[0] != v2[0])
+		return -EINVAL;
+
+	for (i = 1; i < MXT_CFG_VERSION_LEN; i++) {
+		if (v1[i] > v2[i])
+			return MXT_CFG_VERSION_LESS;	/* v2 is older */
+
+		if (v1[i] < v2[i])
+			return MXT_CFG_VERSION_GREATER;	/* v2 is newer */
+	}
+
+	return MXT_CFG_VERSION_EQUAL;	/* v1 and v2 are equal */
+}
+
+static void mxt_check_config_version(struct mxt_data *data,
+			const struct mxt_config_info *cfg_info,
+			bool match_major,
+			const u8 **cfg_version_found,
+			bool *found_cfg_major_match)
+{
+	const u8 *cfg_version;
+	int result = -EINVAL;
+
+	cfg_version = cfg_info->config + data->cfg_version_idx;
+
+	if (*cfg_version_found)
+		result = compare_versions(*cfg_version_found, cfg_version);
+
+	if (match_major) {
+		if (result >= MXT_CFG_VERSION_EQUAL)
+			*found_cfg_major_match = true;
+
+		if (result == MXT_CFG_VERSION_EQUAL ||
+			result == MXT_CFG_VERSION_GREATER) {
+			data->config_info = cfg_info;
+			data->fw_name = cfg_info->fw_name;
+			*cfg_version_found = cfg_version;
+		}
+
+		if (result == MXT_CFG_VERSION_GREATER)
+			data->update_cfg = true;
+	} else if (!*cfg_version_found || result == MXT_CFG_VERSION_GREATER) {
+		data->config_info = cfg_info;
+		data->fw_name = cfg_info->fw_name;
+		data->update_cfg = true;
+		*cfg_version_found = cfg_version;
+	}
+}
+
+/* If the controller's config version has a non-zero major number, call this
+ * function with match_major = true to look for the latest config present in
+ * the pdata based on matching family id, variant id, f/w version, build, and
+ * config major number. If the controller is programmed with wrong config data
+ * previously, call this function with match_major = false to look for latest
+ * config based on based on matching family id, variant id, f/w version and
+ * build only.
+ */
+static int mxt_search_config_array(struct mxt_data *data, bool match_major)
 {
 
 	const struct mxt_platform_data *pdata = data->pdata;
 	const struct mxt_config_info *cfg_info;
-	struct mxt_info *info = &data->info;
+	const struct mxt_info *info = &data->info;
+	const u8 *cfg_version_found;
+	bool found_cfg_major_match = false;
 	int i;
-	u8 cfg_version;
+
+	cfg_version_found = match_major ? data->cfg_version : NULL;
 
 	for (i = 0; i < pdata->config_array_size; i++) {
 
@@ -1061,22 +1155,17 @@ static int mxt_search_config_array(struct mxt_data *data, bool version_match)
 			info->version == cfg_info->version &&
 			info->build == cfg_info->build) {
 
-			cfg_version = cfg_info->config[data->cfg_version_idx];
-			if (data->curr_cfg_version == cfg_version ||
-				!version_match) {
-				data->config_info = cfg_info;
-				data->fw_name = pdata->config_array[i].fw_name;
-				return 0;
-			}
+			mxt_check_config_version(data, cfg_info, match_major,
+				&cfg_version_found, &found_cfg_major_match);
 		}
 	}
 
+	if (data->config_info || found_cfg_major_match)
+		return 0;
+
+	data->config_info = NULL;
 	data->fw_name = NULL;
-	dev_info(&data->client->dev,
-		"Config not found: F: %d, V: %d, FW: %d.%d.%d, CFG: %d\n",
-		info->family_id, info->variant_id,
-		info->version >> 4, info->version & 0xF, info->build,
-		data->curr_cfg_version);
+
 	return -EINVAL;
 }
 
@@ -1099,24 +1188,40 @@ static int mxt_get_config(struct mxt_data *data)
 		return -EINVAL;
 	}
 
-	error = mxt_read_reg(data->client, object->start_address,
-				&data->curr_cfg_version);
+	error = __mxt_read_reg(data->client, object->start_address,
+				sizeof(data->cfg_version), data->cfg_version);
 	if (error) {
 		dev_err(dev, "Unable to read config version\n");
 		return error;
 	}
+	dev_info(dev, "Current config version on the controller is %d.%d.%d\n",
+			data->cfg_version[0], data->cfg_version[1],
+			data->cfg_version[2]);
 
 	/* It is possible that the config data on the controller is not
 	 * versioned and the version number returns 0. In this case,
 	 * find a match without the config version checking.
 	 */
 	error = mxt_search_config_array(data,
-				data->curr_cfg_version != 0 ? true : false);
-	if (error)
-		return error;
+				data->cfg_version[0] != 0 ? true : false);
+	if (error) {
+		/* If a match wasn't found for a non-zero config version,
+		 * it means the controller has the wrong config data. Search
+		 * for a best match based on controller and firmware version,
+		 * but not config version.
+		 */
+		if (data->cfg_version[0])
+			error = mxt_search_config_array(data, false);
+		if (error) {
+			dev_err(dev,
+				"Unable to find matching config in pdata\n");
+			return error;
+		}
+	}
 
 	return 0;
 }
+
 static void mxt_reset_delay(struct mxt_data *data)
 {
 	struct mxt_info *info = &data->info;
@@ -1136,17 +1241,97 @@ static void mxt_reset_delay(struct mxt_data *data)
 	}
 }
 
+static int mxt_backup_nv(struct mxt_data *data)
+{
+	int error;
+	u8 command_register;
+	int timeout_counter = 0;
+
+	/* Backup to memory */
+	mxt_write_object(data, MXT_GEN_COMMAND_T6,
+			MXT_COMMAND_BACKUPNV,
+			MXT_BACKUP_VALUE);
+	msleep(MXT_BACKUP_TIME);
+
+	do {
+		error = mxt_read_object(data, MXT_GEN_COMMAND_T6,
+					MXT_COMMAND_BACKUPNV,
+					&command_register);
+		if (error)
+			return error;
+
+		usleep_range(1000, 2000);
+
+	} while ((command_register != 0) && (++timeout_counter <= 100));
+
+	if (timeout_counter > 100) {
+		dev_err(&data->client->dev, "No response after backup!\n");
+		return -EIO;
+	}
+
+	/* Soft reset */
+	mxt_write_object(data, MXT_GEN_COMMAND_T6, MXT_COMMAND_RESET, 1);
+
+	mxt_reset_delay(data);
+
+	return 0;
+}
+
+static int mxt_save_objects(struct mxt_data *data)
+{
+	struct i2c_client *client = data->client;
+	struct mxt_object *t7_object;
+	struct mxt_object *t9_object;
+	struct mxt_object *t15_object;
+	int error;
+
+	/* Store T7 and T9 locally, used in suspend/resume operations */
+	t7_object = mxt_get_object(data, MXT_GEN_POWER_T7);
+	if (!t7_object) {
+		dev_err(&client->dev, "Failed to get T7 object\n");
+		return -EINVAL;
+	}
+
+	data->t7_start_addr = t7_object->start_address;
+	error = __mxt_read_reg(client, data->t7_start_addr,
+				T7_DATA_SIZE, data->t7_data);
+	if (error < 0) {
+		dev_err(&client->dev,
+			"Failed to save current power state\n");
+		return error;
+	}
+
+	/* Store T9, T15's min and max report ids */
+	t9_object = mxt_get_object(data, MXT_TOUCH_MULTI_T9);
+	if (!t9_object) {
+		dev_err(&client->dev, "Failed to get T9 object\n");
+		return -EINVAL;
+	}
+	data->t9_max_reportid = t9_object->max_reportid;
+	data->t9_min_reportid = t9_object->max_reportid -
+					t9_object->num_report_ids + 1;
+
+	if (data->pdata->key_codes) {
+		t15_object = mxt_get_object(data, MXT_TOUCH_KEYARRAY_T15);
+		if (!t15_object)
+			dev_dbg(&client->dev, "T15 object is not available\n");
+		else {
+			data->t15_max_reportid = t15_object->max_reportid;
+			data->t15_min_reportid = t15_object->max_reportid -
+						t15_object->num_report_ids + 1;
+		}
+	}
+
+	return 0;
+}
+
 static int mxt_initialize(struct mxt_data *data)
 {
 	struct i2c_client *client = data->client;
 	struct mxt_info *info = &data->info;
 	int error;
-	int timeout_counter = 0;
 	u8 val;
-	u8 command_register;
-	struct mxt_object *t7_object;
-	struct mxt_object *t9_object;
-	struct mxt_object *t15_object;
+	const u8 *cfg_ver;
 
 	error = mxt_get_info(data);
 	if (error) {
@@ -1193,80 +1378,39 @@ static int mxt_initialize(struct mxt_data *data)
 		dev_dbg(&client->dev, "Config info not found.\n");
 
 	/* Check register init values */
-	error = mxt_check_reg_init(data);
+	if (data->config_info && data->config_info->config) {
+		if (data->update_cfg) {
+			error = mxt_check_reg_init(data);
+			if (error) {
+				dev_err(&client->dev,
+					"Failed to check reg init value\n");
+				goto free_object_table;
+			}
+
+			error = mxt_backup_nv(data);
+			if (error) {
+				dev_err(&client->dev, "Failed to back up NV\n");
+				goto free_object_table;
+			}
+
+			cfg_ver = data->config_info->config +
+							data->cfg_version_idx;
+			dev_info(&client->dev,
+				"Config updated from %d.%d.%d to %d.%d.%d\n",
+				data->cfg_version[0], data->cfg_version[1],
+				data->cfg_version[2],
+				cfg_ver[0], cfg_ver[1], cfg_ver[2]);
+
+			memcpy(data->cfg_version, cfg_ver, MXT_CFG_VERSION_LEN);
+		}
+	} else {
+		dev_info(&client->dev,
+			"No cfg data defined, skipping check reg init\n");
+	}
+
+	error = mxt_save_objects(data);
 	if (error)
 		goto free_object_table;
-
-	/* Store T7 and T9 locally, used in suspend/resume operations */
-	t7_object = mxt_get_object(data, MXT_GEN_POWER_T7);
-	if (!t7_object) {
-		dev_err(&client->dev, "Failed to get T7 object\n");
-		error = -EINVAL;
-		goto free_object_table;
-	}
-
-	data->t7_start_addr = t7_object->start_address;
-	error = __mxt_read_reg(client, data->t7_start_addr,
-				T7_DATA_SIZE, data->t7_data);
-	if (error < 0) {
-		dev_err(&client->dev,
-			"Failed to save current power state\n");
-		goto free_object_table;
-	}
-	error = mxt_read_object(data, MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL,
-			&data->t9_ctrl);
-	if (error < 0) {
-		dev_err(&client->dev, "Failed to save current touch object\n");
-		goto free_object_table;
-	}
-
-	/* Store T9, T15's min and max report ids */
-	t9_object = mxt_get_object(data, MXT_TOUCH_MULTI_T9);
-	if (!t9_object) {
-		dev_err(&client->dev, "Failed to get T9 object\n");
-		error = -EINVAL;
-		goto free_object_table;
-	}
-	data->t9_max_reportid = t9_object->max_reportid;
-	data->t9_min_reportid = t9_object->max_reportid -
-					t9_object->num_report_ids + 1;
-
-	if (data->pdata->key_codes) {
-		t15_object = mxt_get_object(data, MXT_TOUCH_KEYARRAY_T15);
-		if (!t15_object)
-			dev_dbg(&client->dev, "T15 object is not available\n");
-		else {
-			data->t15_max_reportid = t15_object->max_reportid;
-			data->t15_min_reportid = t15_object->max_reportid -
-						t15_object->num_report_ids + 1;
-		}
-	}
-
-	/* Backup to memory */
-	mxt_write_object(data, MXT_GEN_COMMAND_T6,
-			MXT_COMMAND_BACKUPNV,
-			MXT_BACKUP_VALUE);
-	msleep(MXT_BACKUP_TIME);
-	do {
-		error =  mxt_read_object(data, MXT_GEN_COMMAND_T6,
-					MXT_COMMAND_BACKUPNV,
-					&command_register);
-		if (error)
-			goto free_object_table;
-		usleep_range(1000, 2000);
-	} while ((command_register != 0) && (++timeout_counter <= 100));
-	if (timeout_counter > 100) {
-		dev_err(&client->dev, "No response after backup!\n");
-		error = -EIO;
-		goto free_object_table;
-	}
-
-
-	/* Soft reset */
-	mxt_write_object(data, MXT_GEN_COMMAND_T6,
-			MXT_COMMAND_RESET, 1);
-
-	mxt_reset_delay(data);
 
 	/* Update matrix size at info struct */
 	error = mxt_read_reg(client, MXT_MATRIX_X_SIZE, &val);
@@ -1502,6 +1646,7 @@ static ssize_t mxt_update_fw_store(struct device *dev,
 	int error;
 	const char *fw_name;
 	u8 bootldr_id;
+	u8 cfg_version[MXT_CFG_VERSION_LEN] = {0};
 
 	/* If fw_name is set, then the existing firmware has an upgrade */
 	if (!data->fw_name) {
@@ -1550,6 +1695,13 @@ static ssize_t mxt_update_fw_store(struct device *dev,
 		kfree(data->object_table);
 		data->object_table = NULL;
 		data->cfg_version_idx = 0;
+		data->update_cfg = false;
+
+		error = __mxt_write_reg(data->client, data->t38_start_addr,
+				sizeof(cfg_version), cfg_version);
+		if (error)
+			dev_err(dev,
+			"Unable to zero out config version after fw upgrade\n");
 
 		mxt_initialize(data);
 	}
@@ -1591,13 +1743,6 @@ static int mxt_start(struct mxt_data *data)
 		return error;
 	}
 
-	error = mxt_write_object(data,
-			MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL, data->t9_ctrl);
-	if (error < 0) {
-		dev_err(&data->client->dev, "failed to restore touch\n");
-		return error;
-	}
-
 	return 0;
 }
 
@@ -1605,13 +1750,6 @@ static int mxt_stop(struct mxt_data *data)
 {
 	int error;
 	u8 t7_data[T7_DATA_SIZE] = {0};
-
-	/* disable touch and configure deep sleep mode */
-	error = mxt_write_object(data, MXT_TOUCH_MULTI_T9, MXT_TOUCH_CTRL, 0);
-	if (error < 0) {
-		dev_err(&data->client->dev, "failed to disable touch\n");
-		return error;
-	}
 
 	error = __mxt_write_reg(data->client, data->t7_start_addr,
 				T7_DATA_SIZE, t7_data);
@@ -2071,7 +2209,7 @@ static const struct file_operations mxt_object_fops = {
 	.release	= single_release,
 };
 
-static void __init mxt_debugfs_init(struct mxt_data *data)
+static void __devinit mxt_debugfs_init(struct mxt_data *data)
 {
 	debug_base = debugfs_create_dir(MXT_DEBUGFS_DIR, NULL);
 	if (IS_ERR_OR_NULL(debug_base))
@@ -2123,9 +2261,9 @@ static int __devinit mxt_probe(struct i2c_client *client,
 
 	/* For single touch */
 	input_set_abs_params(input_dev, ABS_X,
-			     0, data->pdata->x_size, 0, 0);
+			pdata->disp_minx, pdata->disp_maxx, 0, 0);
 	input_set_abs_params(input_dev, ABS_Y,
-			     0, data->pdata->y_size, 0, 0);
+			pdata->disp_miny, pdata->disp_maxy, 0, 0);
 	input_set_abs_params(input_dev, ABS_PRESSURE,
 			     0, 255, 0, 0);
 
@@ -2134,21 +2272,11 @@ static int __devinit mxt_probe(struct i2c_client *client,
 	input_set_abs_params(input_dev, ABS_MT_TOUCH_MAJOR,
 			     0, MXT_MAX_AREA, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_X,
-			     0, data->pdata->x_size, 0, 0);
+			pdata->disp_minx, pdata->disp_maxx, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_POSITION_Y,
-			     0, data->pdata->y_size, 0, 0);
+			pdata->disp_miny, pdata->disp_maxy, 0, 0);
 	input_set_abs_params(input_dev, ABS_MT_PRESSURE,
 			     0, 255, 0, 0);
-
-	if (pdata->touch_x_size)
-		data->touch_x_size = pdata->touch_x_size;
-	else
-		data->touch_x_size = pdata->x_size;
-
-	if (pdata->touch_y_size)
-		data->touch_y_size = pdata->touch_y_size;
-	else
-		data->touch_y_size = pdata->y_size;
 
 	/* set key array supported keys */
 	if (pdata->key_codes) {

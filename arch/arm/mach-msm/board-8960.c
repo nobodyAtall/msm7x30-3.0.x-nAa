@@ -1962,7 +1962,7 @@ static const u8 mxt1386e_config_data_v2_1[] = {
 	/* T6 Object */
 	0, 0, 0, 0, 0, 0,
 	/* T38 Object */
-	12, 2, 0, 17, 1, 12, 0, 0, 0, 0,
+	12, 3, 0, 24, 5, 12, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -1974,7 +1974,7 @@ static const u8 mxt1386e_config_data_v2_1[] = {
 	/* T8 Object */
 	25, 0, 20, 20, 0, 0, 20, 50, 0, 0,
 	/* T9 Object */
-	131, 0, 0, 26, 42, 0, 32, 80, 2, 5,
+	139, 0, 0, 26, 42, 0, 32, 80, 2, 5,
 	0, 5, 5, 0, 10, 30, 10, 10, 255, 2,
 	85, 5, 10, 10, 10, 10, 135, 55, 70, 40,
 	10, 5, 0, 0, 0,
@@ -1984,13 +1984,13 @@ static const u8 mxt1386e_config_data_v2_1[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0,
 	/* T25 Object */
-	3, 0, 60, 115, 156, 99,
+	1, 0, 60, 115, 156, 99,
 	/* T27 Object */
 	0, 0, 0, 0, 0, 0, 0,
 	/* T40 Object */
 	0, 0, 0, 0, 0,
 	/* T42 Object */
-	2, 0, 255, 0, 255, 0, 0, 0, 0, 0,
+	0, 0, 255, 0, 255, 0, 0, 0, 0, 0,
 	/* T43 Object */
 	0, 0, 0, 0, 0, 0, 0, 64, 0, 8,
 	16,
@@ -1999,7 +1999,7 @@ static const u8 mxt1386e_config_data_v2_1[] = {
 	/* T47 Object */
 	0, 0, 0, 0, 0, 0, 3, 64, 66, 0,
 	/* T48 Object */
-	31, 64, 64, 0, 0, 0, 0, 0, 0, 0,
+	1, 64, 64, 0, 0, 0, 0, 0, 0, 0,
 	48, 40, 0, 10, 10, 0, 0, 100, 10, 80,
 	0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
 	52, 0, 12, 0, 17, 0, 1, 0, 0, 0,
@@ -2012,6 +2012,63 @@ static const u8 mxt1386e_config_data_v2_1[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	2, 99, 33, 0, 149, 24, 193, 255, 255, 255,
 	255,
+};
+
+/* configuration data for mxt1386e on 3D SKU using V2.1 firmware */
+static const u8 mxt1386e_config_data_3d[] = {
+	/* T6 Object */
+	0, 0, 0, 0, 0, 0,
+	/* T38 Object */
+	13, 1, 0, 23, 2, 12, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	/* T7 Object */
+	100, 10, 50,
+	/* T8 Object */
+	25, 0, 20, 20, 0, 0, 0, 0, 0, 0,
+	/* T9 Object */
+	131, 0, 0, 26, 42, 0, 32, 80, 2, 5,
+	0, 5, 5, 0, 10, 30, 10, 10, 175, 4,
+	127, 7, 26, 21, 17, 19, 143, 35, 207, 40,
+	20, 5, 54, 49, 0,
+	/* T18 Object */
+	0, 0,
+	/* T24 Object */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* T25 Object */
+	0, 0, 72, 113, 168, 97,
+	/* T27 Object */
+	0, 0, 0, 0, 0, 0, 0,
+	/* T40 Object */
+	0, 0, 0, 0, 0,
+	/* T42 Object */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	/* T43 Object */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0,
+	/* T46 Object */
+	68, 0, 16, 16, 0, 0, 0, 0, 0,
+	/* T47 Object */
+	0, 0, 0, 0, 0, 0, 3, 64, 66, 0,
+	/* T48 Object */
+	31, 64, 64, 0, 0, 0, 0, 0, 0, 0,
+	32, 50, 0, 10, 10, 0, 0, 100, 10, 90,
+	0, 0, 0, 0, 0, 0, 0, 10, 1, 30,
+	52, 10, 5, 0, 33, 0, 1, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0,
+	/* T56 Object */
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	0,
 };
 
 #define MXT_TS_GPIO_IRQ			11
@@ -2042,7 +2099,7 @@ err_ldo_gpio_req:
 	gpio_free(MXT_TS_LDO_EN_GPIO);
 }
 
-static struct mxt_config_info mxt_config_array[] = {
+static struct mxt_config_info mxt_config_array_2d[] = {
 	{
 		.config		= mxt1386_config_data,
 		.config_length	= ARRAY_SIZE(mxt1386_config_data),
@@ -2050,6 +2107,7 @@ static struct mxt_config_info mxt_config_array[] = {
 		.variant_id	= 0x0,
 		.version	= 0x10,
 		.build		= 0xAA,
+		.bootldr_id	= MXT_BOOTLOADER_ID_1386,
 	},
 	{
 		.config		= mxt1386e_config_data_v1_0,
@@ -2058,6 +2116,8 @@ static struct mxt_config_info mxt_config_array[] = {
 		.variant_id	= 0x2,
 		.version	= 0x10,
 		.build		= 0xAA,
+		.bootldr_id	= MXT_BOOTLOADER_ID_1386E,
+		.fw_name	= "atmel_8960_liquid_v2_2_AA.hex",
 	},
 	{
 		.config		= mxt1386e_config_data_v2_1,
@@ -2066,14 +2126,60 @@ static struct mxt_config_info mxt_config_array[] = {
 		.variant_id	= 0x7,
 		.version	= 0x21,
 		.build		= 0xAA,
+		.bootldr_id	= MXT_BOOTLOADER_ID_1386E,
+		.fw_name	= "atmel_8960_liquid_v2_2_AA.hex",
+	},
+	{
+		/* The config data for V2.2.AA is the same as for V2.1.AA */
+		.config		= mxt1386e_config_data_v2_1,
+		.config_length	= ARRAY_SIZE(mxt1386e_config_data_v2_1),
+		.family_id	= 0xA0,
+		.variant_id	= 0x7,
+		.version	= 0x22,
+		.build		= 0xAA,
+		.bootldr_id	= MXT_BOOTLOADER_ID_1386E,
 	},
 };
 
-static struct mxt_platform_data mxt_platform_data = {
-	.config_array		= mxt_config_array,
-	.config_array_size	= ARRAY_SIZE(mxt_config_array),
-	.x_size			= 1365,
-	.y_size			= 767,
+static struct mxt_platform_data mxt_platform_data_2d = {
+	.config_array		= mxt_config_array_2d,
+	.config_array_size	= ARRAY_SIZE(mxt_config_array_2d),
+	.panel_minx		= 0,
+	.panel_maxx		= 1365,
+	.panel_miny		= 0,
+	.panel_maxy		= 767,
+	.disp_minx		= 0,
+	.disp_maxx		= 1365,
+	.disp_miny		= 0,
+	.disp_maxy		= 767,
+	.irqflags		= IRQF_TRIGGER_FALLING,
+	.i2c_pull_up		= true,
+	.reset_gpio		= MXT_TS_RESET_GPIO,
+	.irq_gpio		= MXT_TS_GPIO_IRQ,
+};
+
+static struct mxt_config_info mxt_config_array_3d[] = {
+	{
+		.config		= mxt1386e_config_data_3d,
+		.config_length	= ARRAY_SIZE(mxt1386e_config_data_3d),
+		.family_id	= 0xA0,
+		.variant_id	= 0x7,
+		.version	= 0x21,
+		.build		= 0xAA,
+	},
+};
+
+static struct mxt_platform_data mxt_platform_data_3d = {
+	.config_array		= mxt_config_array_3d,
+	.config_array_size	= ARRAY_SIZE(mxt_config_array_3d),
+	.panel_minx		= 0,
+	.panel_maxx		= 1919,
+	.panel_miny		= 0,
+	.panel_maxy		= 1199,
+	.disp_minx		= 0,
+	.disp_maxx		= 1919,
+	.disp_miny		= 0,
+	.disp_maxy		= 1199,
 	.irqflags		= IRQF_TRIGGER_FALLING,
 	.i2c_pull_up		= true,
 	.reset_gpio		= MXT_TS_RESET_GPIO,
@@ -2083,7 +2189,6 @@ static struct mxt_platform_data mxt_platform_data = {
 static struct i2c_board_info mxt_device_info[] __initdata = {
 	{
 		I2C_BOARD_INFO("atmel_mxt_ts", 0x5b),
-		.platform_data = &mxt_platform_data,
 		.irq = MSM_GPIO_TO_INT(MXT_TS_GPIO_IRQ),
 	},
 };
@@ -2755,6 +2860,15 @@ static void __init register_i2c_devices(void)
 		mach_mask = I2C_FFA;
 	else
 		pr_err("unmatched machine ID in register_i2c_devices\n");
+
+	if (machine_is_msm8960_liquid()) {
+		if (SOCINFO_VERSION_MAJOR(socinfo_get_platform_version()) == 3)
+			mxt_device_info[0].platform_data =
+						&mxt_platform_data_3d;
+		else
+			mxt_device_info[0].platform_data =
+						&mxt_platform_data_2d;
+	}
 
 	/* Run the array and install devices as appropriate */
 	for (i = 0; i < ARRAY_SIZE(msm8960_i2c_devices); ++i) {
