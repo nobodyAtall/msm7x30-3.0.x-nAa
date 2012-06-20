@@ -224,7 +224,7 @@ static DEFINE_SPINLOCK(wakelock_reference_lock);
 static int wakelock_reference_count;
 static struct delayed_work msm9615_bam_init_work;
 static int a2_pc_disabled_wakelock_skipped;
-static int disconnect_ack;
+static int disconnect_ack = 1;
 /* End A2 power collaspe */
 
 /* subsystem restart */
@@ -537,9 +537,9 @@ static void handle_bam_mux_cmd(struct work_struct *work)
 		bam_dmux_log("%s: opening cid %d PC enabled\n", __func__,
 				rx_hdr->ch_id);
 		handle_bam_mux_cmd_open(rx_hdr);
-		if (rx_hdr->reserved & ENABLE_DISCONNECT_ACK) {
-			bam_dmux_log("%s: activating disconnect ack\n");
-			disconnect_ack = 1;
+		if (!(rx_hdr->reserved & ENABLE_DISCONNECT_ACK)) {
+			bam_dmux_log("%s: deactivating disconnect ack\n");
+			disconnect_ack = 0;
 		}
 		dev_kfree_skb_any(rx_skb);
 		break;
