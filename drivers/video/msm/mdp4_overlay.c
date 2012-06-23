@@ -2853,6 +2853,11 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		mdp4_overlay_rgb_setup(pipe);	/* rgb pipe */
 	}
 
+	if ((ctrl->panel_mode & MDP4_PANEL_DTV) ||
+		(ctrl->panel_mode & MDP4_PANEL_LCDC) ||
+		(ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO))
+		mdp4_overlay_reg_flush(pipe, 0);
+
 	mdp4_mixer_stage_up(pipe);
 
 	if (pipe->mixer_num == MDP4_MIXER2) {
@@ -2867,7 +2872,6 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		ctrl->mixer1_played++;
 		/* enternal interface */
 		if (ctrl->panel_mode & MDP4_PANEL_DTV) {
-			mdp4_overlay_reg_flush(pipe, 0);
 			mdp4_overlay_dtv_start();
 			mdp4_overlay_dtv_ov_done_push(mfd, pipe);
 			if (!mfd->use_ov1_blt)
@@ -2878,7 +2882,6 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		/* primary interface */
 		ctrl->mixer0_played++;
 		if (ctrl->panel_mode & MDP4_PANEL_LCDC) {
-			mdp4_overlay_reg_flush(pipe, 0);
 			mdp4_overlay_lcdc_start();
 			mdp4_overlay_lcdc_vsync_push(mfd, pipe);
 			if (!mfd->use_ov0_blt &&
@@ -2887,7 +2890,6 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		}
 #ifdef CONFIG_FB_MSM_MIPI_DSI
 		else if (ctrl->panel_mode & MDP4_PANEL_DSI_VIDEO) {
-			mdp4_overlay_reg_flush(pipe, 0);
 			mdp4_overlay_dsi_video_start();
 			mdp4_overlay_dsi_video_vsync_push(mfd, pipe);
 			if (!mfd->use_ov0_blt &&
