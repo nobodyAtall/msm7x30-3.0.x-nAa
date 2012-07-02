@@ -2691,7 +2691,15 @@ int mdp4_overlay_play_wait(struct fb_info *info, struct msmfb_overlay_data *req)
 
 	mdp4_mixer_stage_commit(pipe->mixer_num);
 
-	if (mfd->use_ov1_blt)
+	if (mfd->panel_info.pdest == MDP4_MIXER1) {
+		if (dbg_force_ov1_blt)
+			mfd->use_ov1_blt |= (0x1 << 8);
+		else
+			mfd->use_ov1_blt &= ~(0x1 << 8);
+	}
+
+	if (mfd->use_ov1_blt &&
+	    (mfd->panel_info.pdest == MDP4_MIXER1))
 		mdp4_overlay1_update_blt_mode(mfd);
 
 	mdp4_overlay_dtv_wait_for_ov(mfd, pipe);
@@ -2835,10 +2843,26 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 		}
 	}
 
-	if (mfd->use_ov0_blt)
+	if (mfd->panel_info.pdest == MDP4_MIXER0) {
+		if (dbg_force_ov0_blt)
+			mfd->use_ov0_blt |= (0x1 << 8);
+		else
+			mfd->use_ov0_blt &= ~(0x1 << 8);
+	}
+
+	if (mfd->use_ov0_blt &&
+	    mfd->panel_info.pdest == MDP4_MIXER0)
 		mdp4_overlay_update_blt_mode(mfd);
 
-	if (mfd->use_ov1_blt)
+	if (mfd->panel_info.pdest == MDP4_MIXER1) {
+		if (dbg_force_ov1_blt)
+			mfd->use_ov1_blt |= (0x1 << 8);
+		else
+			mfd->use_ov1_blt &= ~(0x1 << 8);
+	}
+
+	if (mfd->use_ov1_blt &&
+	    (mfd->panel_info.pdest == MDP4_MIXER1))
 		mdp4_overlay1_update_blt_mode(mfd);
 
 	if (pipe->pipe_type == OVERLAY_TYPE_VIDEO) {
