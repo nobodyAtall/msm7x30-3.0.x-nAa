@@ -50,7 +50,7 @@ static struct clk *mdp_pclk;
 static struct clk *mdp_lut_clk;
 int mdp_rev;
 
-static struct regulator *footswitch;
+static struct regulator *footswitch, *hdmi_pll_fs;
 static unsigned int mdp_footswitch_on;
 
 struct completion mdp_ppp_comp;
@@ -2049,7 +2049,8 @@ unsigned long mdp_perf_level2clk_rate(uint32 perf_level)
 	return clk_rate;
 }
 
-static int mdp_irq_clk_setup(char cont_splashScreen)
+static int mdp_irq_clk_setup(struct platform_device *pdev,
+		char cont_splashScreen)
 {
 	int ret;
 
@@ -2064,12 +2065,20 @@ static int mdp_irq_clk_setup(char cont_splashScreen)
 	}
 	disable_irq(mdp_irq);
 
-	footswitch = regulator_get(NULL, "fs_mdp");
+	hdmi_pll_fs = regulator_get(&pdev->dev, "hdmi_pll_fs");
+	if (IS_ERR(hdmi_pll_fs))
+		hdmi_pll_fs = NULL;
+
+	footswitch = regulator_get(&pdev->dev, "vdd");
 	if (IS_ERR(footswitch))
 		footswitch = NULL;
 	else {
+		if (hdmi_pll_fs)
+			regulator_enable(hdmi_pll_fs);
 		regulator_enable(footswitch);
 		mdp_footswitch_on = 1;
+		if (hdmi_pll_fs)
+			regulator_disable(hdmi_pll_fs);
 	}
 
 	mdp_clk = clk_get(NULL, "mdp_clk");
@@ -2156,7 +2165,7 @@ static int mdp_probe(struct platform_device *pdev)
 
 		mdp_rev = mdp_pdata->mdp_rev;
 
-		rc = mdp_irq_clk_setup(mdp_pdata->cont_splash_enabled);
+		rc = mdp_irq_clk_setup(pdev, mdp_pdata->cont_splash_enabled);
 
 		if (rc)
 			return rc;
@@ -2545,6 +2554,9 @@ void mdp_footswitch_ctrl(boolean on)
 		return;
 	}
 
+	if (hdmi_pll_fs)
+		regulator_enable(hdmi_pll_fs);
+
 	if (on && !mdp_footswitch_on) {
 		pr_debug("Enable MDP FS\n");
 		regulator_enable(footswitch);
@@ -2554,6 +2566,9 @@ void mdp_footswitch_ctrl(boolean on)
 		regulator_disable(footswitch);
 		mdp_footswitch_on = 0;
 	}
+
+	if (hdmi_pll_fs)
+		regulator_disable(hdmi_pll_fs);
 
 	mutex_unlock(&mdp_suspend_mutex);
 }
