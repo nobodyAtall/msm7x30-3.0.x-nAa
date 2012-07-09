@@ -2069,7 +2069,7 @@ static int mdp_irq_clk_setup(struct platform_device *pdev,
 	if (IS_ERR(hdmi_pll_fs))
 		hdmi_pll_fs = NULL;
 
-	footswitch = regulator_get(&pdev->dev, "vdd");
+	footswitch = regulator_get(NULL, "fs_mdp");
 	if (IS_ERR(footswitch))
 		footswitch = NULL;
 	else {
