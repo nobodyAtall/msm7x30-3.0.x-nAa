@@ -2232,7 +2232,7 @@ static inline int msmsdcc_setup_clocks(struct msmsdcc_host *host, bool enable)
 
 	if (enable && !atomic_read(&host->clks_on)) {
 		if (!IS_ERR_OR_NULL(host->dfab_pclk)) {
-			rc = clk_prepare_enable(host->dfab_pclk);
+			rc = clk_enable(host->dfab_pclk);
 			if (rc) {
 				pr_err("%s: %s: failed to enable the bus-clock with error %d\n",
 					mmc_hostname(host->mmc), __func__, rc);
@@ -2240,14 +2240,14 @@ static inline int msmsdcc_setup_clocks(struct msmsdcc_host *host, bool enable)
 			}
 		}
 		if (!IS_ERR(host->pclk)) {
-			rc = clk_prepare_enable(host->pclk);
+			rc = clk_enable(host->pclk);
 			if (rc) {
 				pr_err("%s: %s: failed to enable the pclk with error %d\n",
 					mmc_hostname(host->mmc), __func__, rc);
 				goto disable_bus;
 			}
 		}
-		rc = clk_prepare_enable(host->clk);
+		rc = clk_enable(host->clk);
 		if (rc) {
 			pr_err("%s: %s: failed to enable the host-clk with error %d\n",
 				mmc_hostname(host->mmc), __func__, rc);
@@ -2259,21 +2259,21 @@ static inline int msmsdcc_setup_clocks(struct msmsdcc_host *host, bool enable)
 	} else if (!enable && atomic_read(&host->clks_on)) {
 		mb();
 		msmsdcc_delay(host);
-		clk_disable_unprepare(host->clk);
+		clk_disable(host->clk);
 		if (!IS_ERR(host->pclk))
-			clk_disable_unprepare(host->pclk);
+			clk_disable(host->pclk);
 		if (!IS_ERR_OR_NULL(host->dfab_pclk))
-			clk_disable_unprepare(host->dfab_pclk);
+			clk_disable(host->dfab_pclk);
 		atomic_set(&host->clks_on, 0);
 	}
 	goto out;
 
 disable_pclk:
 	if (!IS_ERR_OR_NULL(host->pclk))
-		clk_disable_unprepare(host->pclk);
+		clk_disable(host->pclk);
 disable_bus:
 	if (!IS_ERR_OR_NULL(host->dfab_pclk))
-		clk_disable_unprepare(host->dfab_pclk);
+		clk_disable(host->dfab_pclk);
 out:
 	return rc;
 }
