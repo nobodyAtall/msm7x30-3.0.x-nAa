@@ -2062,23 +2062,43 @@ static void msm_otg_set_vbus_state(int online)
 	schedule_work(&motg->sm_work);
 }
 
+static void msm_pmic_id_status_w(struct work_struct *w)
+{
+	struct msm_otg *motg = container_of(w, struct msm_otg,
+						pmic_id_status_work.work);
+	int work = 0;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	if (irq_read_line(motg->pdata->pmic_id_irq)) {
+		if (!test_and_set_bit(ID, &motg->inputs)) {
+			pr_debug("PMIC: ID set\n");
+			work = 1;
+		}
+	} else {
+		if (test_and_clear_bit(ID, &motg->inputs)) {
+			pr_debug("PMIC: ID clear\n");
+			work = 1;
+		}
+	}
+
+
+	if (work && (motg->otg.state != OTG_STATE_UNDEFINED))
+		schedule_work(&motg->sm_work);
+
+	local_irq_restore(flags);
+
+}
+
+#define MSM_PMIC_ID_STATUS_DELAY	5 /* 5msec */
 static irqreturn_t msm_pmic_id_irq(int irq, void *data)
 {
 	struct msm_otg *motg = data;
 
-	if (aca_id_turned_on)
-		return IRQ_HANDLED;
-
-	if (irq_read_line(motg->pdata->pmic_id_irq)) {
-		pr_debug("PMIC: ID set\n");
-		set_bit(ID, &motg->inputs);
-	} else {
-		pr_debug("PMIC: ID clear\n");
-		clear_bit(ID, &motg->inputs);
-	}
-
-	if (motg->otg.state != OTG_STATE_UNDEFINED)
-		schedule_work(&motg->sm_work);
+	if (!aca_id_turned_on)
+		/*schedule delayed work for 5msec for ID line state to settle*/
+		schedule_delayed_work(&motg->pmic_id_status_work,
+			msecs_to_jiffies(MSM_PMIC_ID_STATUS_DELAY));
 
 	return IRQ_HANDLED;
 }
@@ -2668,6 +2688,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	wake_lock_init(&motg->wlock, WAKE_LOCK_SUSPEND, "msm_otg");
 	INIT_WORK(&motg->sm_work, msm_otg_sm_work);
 	INIT_DELAYED_WORK(&motg->chg_work, msm_chg_detect_work);
+	INIT_DELAYED_WORK(&motg->pmic_id_status_work, msm_pmic_id_status_w);
 	setup_timer(&motg->id_timer, msm_otg_id_timer_func,
 				(unsigned long) motg);
 	ret = request_irq(motg->irq, msm_otg_irq, IRQF_SHARED,
@@ -2801,6 +2822,7 @@ static int __devexit msm_otg_remove(struct platform_device *pdev)
 		pm8921_charger_unregister_vbus_sn(0);
 	msm_otg_debugfs_cleanup();
 	cancel_delayed_work_sync(&motg->chg_work);
+	cancel_delayed_work_sync(&motg->pmic_id_status_work);
 	cancel_work_sync(&motg->sm_work);
 
 	pm_runtime_resume(&pdev->dev);
