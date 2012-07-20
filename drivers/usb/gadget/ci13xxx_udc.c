@@ -55,6 +55,7 @@
 #include <linux/dmapool.h>
 #include <linux/dma-mapping.h>
 #include <linux/init.h>
+#include <linux/ratelimit.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
 #include <linux/irq.h>
@@ -71,6 +72,9 @@
 /******************************************************************************
  * DEFINE
  *****************************************************************************/
+
+#define ATDTW_SET_DELAY		100 /* 100msec delay */
+
 /* ctrl register bank access */
 static DEFINE_SPINLOCK(udc_lock);
 
@@ -1665,6 +1669,7 @@ static int _hardware_enqueue(struct ci13xxx_ep *mEp, struct ci13xxx_req *mReq)
 		struct ci13xxx_req *mReqPrev;
 		int n = hw_ep_bit(mEp->num, mEp->dir);
 		int tmp_stat;
+		ktime_t start, diff;
 
 		mReqPrev = list_entry(mEp->qh.queue.prev,
 				struct ci13xxx_req, queue);
@@ -1675,9 +1680,20 @@ static int _hardware_enqueue(struct ci13xxx_ep *mEp, struct ci13xxx_req *mReq)
 		wmb();
 		if (hw_cread(CAP_ENDPTPRIME, BIT(n)))
 			goto done;
+		start = ktime_get();
 		do {
 			hw_cwrite(CAP_USBCMD, USBCMD_ATDTW, USBCMD_ATDTW);
 			tmp_stat = hw_cread(CAP_ENDPTSTAT, BIT(n));
+			diff = ktime_sub(ktime_get(), start);
+			/* poll for max. 100ms */
+			if (ktime_to_ms(diff) > ATDTW_SET_DELAY) {
+				if (hw_cread(CAP_USBCMD, USBCMD_ATDTW))
+					break;
+				printk_ratelimited(KERN_ERR
+				"%s:queue failed ep#%d %s\n",
+				 __func__, mEp->num, mEp->dir ? "IN" : "OUT");
+				return -EAGAIN;
+			}
 		} while (!hw_cread(CAP_USBCMD, USBCMD_ATDTW));
 		hw_cwrite(CAP_USBCMD, USBCMD_ATDTW, 0);
 		if (tmp_stat)
