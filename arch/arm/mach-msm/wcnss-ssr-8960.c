@@ -130,6 +130,7 @@ static int riva_shutdown(const struct subsys_data *subsys)
 {
 	pil_force_shutdown("wcnss");
 	flush_delayed_work(&cancel_vote_work);
+	wcnss_flush_delayed_boot_votes();
 	disable_irq_nosync(RIVA_APSS_WDOG_BITE_RESET_RDY_IRQ);
 
 	return 0;
@@ -158,10 +159,9 @@ static int riva_powerup(const struct subsys_data *subsys)
 	return ret;
 }
 
-/* RAM segments for Riva SS;
- * We don't specify the full 5MB allocated for Riva. Only 3MB is specified */
+/* 5MB RAM segments for Riva SS */
 static struct ramdump_segment riva_segments[] = {{0x8f200000,
-						0x8f500000 - 0x8f200000} };
+						0x8f700000 - 0x8f200000} };
 
 static int riva_ramdump(int enable, const struct subsys_data *subsys)
 {
