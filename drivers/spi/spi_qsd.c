@@ -1756,6 +1756,7 @@ static void msm_spi_workq(struct work_struct *work)
 		container_of(work, struct msm_spi, work_data);
 	unsigned long        flags;
 	u32                  status_error = 0;
+	int                  rc = 0;
 
 	mutex_lock(&dd->core_lock);
 
@@ -1765,6 +1766,21 @@ static void msm_spi_workq(struct work_struct *work)
 				  dd->pm_lat);
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
+
+	/* Configure the spi clk, miso, mosi and cs gpio */
+	if (dd->pdata->gpio_config) {
+		rc = dd->pdata->gpio_config();
+		if (rc) {
+			dev_err(dd->dev,
+					"%s: error configuring GPIOs\n",
+					__func__);
+			status_error = 1;
+		}
+	}
+
+	rc = msm_spi_request_gpios(dd);
+	if (rc)
+		status_error = 1;
 
 	clk_enable(dd->clk);
 	clk_enable(dd->pclk);
@@ -1796,6 +1812,12 @@ static void msm_spi_workq(struct work_struct *work)
 	msm_spi_disable_irqs(dd);
 	clk_disable(dd->clk);
 	clk_disable(dd->pclk);
+
+	/* Free  the spi clk, miso, mosi, cs gpio */
+	if (!rc && dd->pdata && dd->pdata->gpio_release)
+		dd->pdata->gpio_release();
+	if (!rc)
+		msm_spi_free_gpios(dd);
 
 	if (dd->use_rlock)
 		remote_mutex_unlock(&dd->r_lock);
@@ -1883,6 +1905,24 @@ static int msm_spi_setup(struct spi_device *spi)
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
 
+	/* Configure the spi clk, miso, mosi, cs gpio */
+	if (dd->pdata->gpio_config) {
+		rc = dd->pdata->gpio_config();
+		if (rc) {
+			dev_err(&spi->dev,
+					"%s: error configuring GPIOs\n",
+					__func__);
+			rc = -ENXIO;
+			goto err_setup_gpio;
+		}
+	}
+
+	rc = msm_spi_request_gpios(dd);
+	if (rc) {
+		rc = -ENXIO;
+		goto err_setup_gpio;
+	}
+
 	clk_enable(dd->clk);
 	clk_enable(dd->pclk);
 
@@ -1915,10 +1955,15 @@ static int msm_spi_setup(struct spi_device *spi)
 	clk_disable(dd->clk);
 	clk_disable(dd->pclk);
 
+	/* Free  the spi clk, miso, mosi, cs gpio */
+	if (dd->pdata && dd->pdata->gpio_release)
+		dd->pdata->gpio_release();
+	msm_spi_free_gpios(dd);
+
+err_setup_gpio:
 	if (dd->use_rlock)
 		remote_mutex_unlock(&dd->r_lock);
 	mutex_unlock(&dd->core_lock);
-
 err_setup_exit:
 	return rc;
 }
@@ -2293,18 +2338,8 @@ static int __init msm_spi_probe(struct platform_device *pdev)
 			dd->use_dma = 1;
 			master->dma_alignment =	dma_get_cache_alignment();
 		}
-
-skip_dma_resources:
-		if (pdata->gpio_config) {
-			rc = pdata->gpio_config();
-			if (rc) {
-				dev_err(&pdev->dev,
-					"%s: error configuring GPIOs\n",
-					__func__);
-				goto err_probe_gpio;
-			}
-		}
 	}
+skip_dma_resources:
 
 	for (i = 0; i < ARRAY_SIZE(spi_rsrcs); ++i) {
 		resource = platform_get_resource_byname(pdev, IORESOURCE_IO,
@@ -2318,10 +2353,6 @@ skip_dma_resources:
 		dd->cs_gpios[i].gpio_num = resource ? resource->start : -1;
 		dd->cs_gpios[i].valid = 0;
 	}
-
-	rc = msm_spi_request_gpios(dd);
-	if (rc)
-		goto err_probe_gpio;
 
 	spin_lock_init(&dd->queue_lock);
 	mutex_init(&dd->core_lock);
@@ -2359,8 +2390,8 @@ skip_dma_resources:
 		}
 		dd->use_rlock = 1;
 		dd->pm_lat = pdata->pm_lat;
-		pm_qos_add_request(&qos_req_list, PM_QOS_CPU_DMA_LATENCY, 
-					    	 PM_QOS_DEFAULT_VALUE);
+		pm_qos_add_request(&qos_req_list, PM_QOS_CPU_DMA_LATENCY,
+					PM_QOS_DEFAULT_VALUE);
 	}
 	mutex_lock(&dd->core_lock);
 	if (dd->use_rlock)
@@ -2494,10 +2525,6 @@ err_probe_ioremap:
 err_probe_reqmem:
 	destroy_workqueue(dd->workqueue);
 err_probe_workq:
-	msm_spi_free_gpios(dd);
-err_probe_gpio:
-	if (pdata && pdata->gpio_release)
-		pdata->gpio_release();
 err_probe_res2:
 err_probe_res:
 	spi_master_put(master);
@@ -2525,7 +2552,6 @@ static int msm_spi_suspend(struct platform_device *pdev, pm_message_t state)
 
 	/* Wait for transactions to end, or time out */
 	wait_event_interruptible(dd->continue_suspend, !dd->transfer_pending);
-	msm_spi_free_gpios(dd);
 
 suspend_exit:
 	return 0;
@@ -2542,7 +2568,6 @@ static int msm_spi_resume(struct platform_device *pdev)
 	if (!dd)
 		goto resume_exit;
 
-	BUG_ON(msm_spi_request_gpios(dd) != 0);
 	dd->suspended = 0;
 resume_exit:
 	return 0;
@@ -2556,7 +2581,6 @@ static int __devexit msm_spi_remove(struct platform_device *pdev)
 {
 	struct spi_master *master = platform_get_drvdata(pdev);
 	struct msm_spi    *dd = spi_master_get_devdata(master);
-	struct msm_spi_platform_data *pdata = pdev->dev.platform_data;
 
 	pm_qos_remove_request(&qos_req_list);
 	spi_debugfs_exit(dd);
@@ -2564,11 +2588,6 @@ static int __devexit msm_spi_remove(struct platform_device *pdev)
 
 	msm_spi_free_irq(dd, master);
 	msm_spi_teardown_dma(dd);
-
-	if (pdata && pdata->gpio_release)
-		pdata->gpio_release();
-
-	msm_spi_free_gpios(dd);
 	iounmap(dd->base);
 	release_mem_region(dd->mem_phys_addr, dd->mem_size);
 	msm_spi_release_gsbi(dd);
