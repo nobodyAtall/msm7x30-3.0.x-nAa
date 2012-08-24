@@ -496,8 +496,16 @@ static int yaffs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	if (ret_val == YAFFS_OK) {
 		if (target) {
-			new_dentry->d_inode->i_nlink--;
-			mark_inode_dirty(new_dentry->d_inode);
+			/*
+			 * We have identified target to be a
+			 * valid directory earlier. If it is
+			 * not the case throw a warning.
+			 */
+			WARN_ON(!new_dentry->d_inode);
+			if (new_dentry->d_inode) {
+				new_dentry->d_inode->i_nlink--;
+				mark_inode_dirty(new_dentry->d_inode);
+			}
 		}
 
 		update_dir_time(old_dir);
