@@ -735,7 +735,7 @@ adreno_recover_hang(struct kgsl_device *device,
 	rb->timestamp = timestamp;
 
 	/* wait for idle */
-	ret = adreno_idle(device, KGSL_TIMEOUT_DEFAULT);
+	ret = adreno_idle(device);
 done:
 	kgsl_sharedmem_writel(&device->memstore,
 			KGSL_DEVICE_MEMSTORE_OFFSET(eoptimestamp),
@@ -947,67 +947,85 @@ static inline void adreno_poke(struct kgsl_device *device)
 	adreno_regwrite(device, REG_CP_RB_WPTR, adreno_dev->ringbuffer.wptr);
 }
 
-/* Caller must hold the device mutex. */
-int adreno_idle(struct kgsl_device *device, unsigned int timeout)
+static int adreno_ringbuffer_drain(struct kgsl_device *device,
+	unsigned int *regs)
 {
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	struct adreno_ringbuffer *rb = &adreno_dev->ringbuffer;
+	unsigned long wait;
+	unsigned long timeout = jiffies + msecs_to_jiffies(ADRENO_IDLE_TIMEOUT);
+
+	if (!(rb->flags & KGSL_FLAGS_STARTED))
+		return 0;
+
+	/*
+	 * The first time into the loop, wait for 100 msecs and kick wptr again
+	 * to ensure that the hardware has updated correctly.  After that, kick
+	 * it periodically every KGSL_TIMEOUT_PART msecs until the timeout
+	 * expires
+	 */
+
+	wait = jiffies + msecs_to_jiffies(100);
+
+	adreno_poke(device);
+
+	do {
+		if (time_after(jiffies, wait)) {
+			adreno_poke(device);
+
+			/* Check to see if the core is hung */
+			if (adreno_hang_detect(device, regs))
+				return -ETIMEDOUT;
+
+			wait = jiffies + msecs_to_jiffies(KGSL_TIMEOUT_PART);
+		}
+		GSL_RB_GET_READPTR(rb, &rb->rptr);
+
+		if (time_after(jiffies, timeout)) {
+			KGSL_DRV_ERR(device, "rptr: %x, wptr: %x\n",
+				rb->rptr, rb->wptr);
+			return -ETIMEDOUT;
+		}
+	} while (rb->rptr != rb->wptr);
+
+	return 0;
+}
+
+/* Caller must hold the device mutex. */
+int adreno_idle(struct kgsl_device *device)
+{
 	unsigned int rbbm_status;
-	unsigned long wait_timeout =
-		msecs_to_jiffies(adreno_dev->wait_timeout);
 	unsigned long wait_time;
 	unsigned long wait_time_part;
-	unsigned int msecs;
-	unsigned int msecs_first;
-	unsigned int msecs_part = KGSL_TIMEOUT_PART;
 	unsigned int prev_reg_val[hang_detect_regs_count];
 
 	memset(prev_reg_val, 0, sizeof(prev_reg_val));
 
 	kgsl_cffdump_regpoll(device->id, REG_RBBM_STATUS << 2,
 		0x00000000, 0x80000000);
-	/* first, wait until the CP has consumed all the commands in
-	 * the ring buffer
-	 */
+
 retry:
-	if (rb->flags & KGSL_FLAGS_STARTED) {
-		msecs = adreno_dev->wait_timeout;
-		msecs_first = (msecs <= 100) ? ((msecs + 4) / 5) : 100;
-		wait_time = jiffies + wait_timeout;
-		wait_time_part = jiffies + msecs_to_jiffies(msecs_first);
-		adreno_poke(device);
-		do {
-			if (time_after(jiffies, wait_time_part)) {
-				adreno_poke(device);
-				wait_time_part = jiffies +
-					msecs_to_jiffies(msecs_part);
-				if ((adreno_hang_detect(device, prev_reg_val)))
-					goto err;
-			}
-			GSL_RB_GET_READPTR(rb, &rb->rptr);
-			if (time_after(jiffies, wait_time)) {
-				KGSL_DRV_ERR(device, "rptr: %x, wptr: %x\n",
-					rb->rptr, rb->wptr);
-				goto err;
-			}
-		} while (rb->rptr != rb->wptr);
-	}
+	/* First, wait for the ringbuffer to drain */
+	if (adreno_ringbuffer_drain(device, prev_reg_val))
+		goto err;
 
 	/* now, wait for the GPU to finish its operations */
-	wait_time = jiffies + wait_timeout;
-	wait_time_part = jiffies + msecs_to_jiffies(msecs_part);
+	wait_time = jiffies + ADRENO_IDLE_TIMEOUT;
+	wait_time_part = jiffies + msecs_to_jiffies(KGSL_TIMEOUT_PART);
+
 	while (time_before(jiffies, wait_time)) {
 		adreno_regread(device, REG_RBBM_STATUS, &rbbm_status);
 		if (rbbm_status == 0x110)
 			return 0;
+	}
 		/* Dont wait for timeout, detect hang faster.
 		 */
 		if (time_after(jiffies, wait_time_part)) {
 				wait_time_part = jiffies +
-					msecs_to_jiffies(msecs_part);
+					msecs_to_jiffies(KGSL_TIMEOUT_PART);
 				if ((adreno_hang_detect(device, prev_reg_val)))
 					goto err;
-		}
+}
 
 
 
@@ -1015,7 +1033,7 @@ err:
 	KGSL_DRV_ERR(device, "spun too long waiting for RB to idle\n");
 	if (KGSL_STATE_DUMP_AND_RECOVER != device->state &&
 		!adreno_dump_and_recover(device)) {
-		wait_time = jiffies + wait_timeout;
+		wait_time = jiffies + ADRENO_IDLE_TIMEOUT;
 		goto retry;
 	}
 	return -ETIMEDOUT;
@@ -1055,7 +1073,7 @@ static int adreno_suspend_context(struct kgsl_device *device)
 	/* switch to NULL ctxt */
 	if (adreno_dev->drawctxt_active != NULL) {
 		adreno_drawctxt_switch(adreno_dev, NULL, 0);
-		status = adreno_idle(device, KGSL_TIMEOUT_DEFAULT);
+		status = adreno_idle(device);
 	}
 
 	return status;
@@ -1278,9 +1296,6 @@ static int adreno_waittimestamp(struct kgsl_device *device,
 	struct adreno_device *adreno_dev = ADRENO_DEVICE(device);
 	struct kgsl_pwrctrl *pwr = &device->pwrctrl;
 	int retries = 0;
-
-	unsigned int msecs_first;
-	unsigned int msecs_part = KGSL_TIMEOUT_PART;
 
 	unsigned int time_elapsed = 0;
 	unsigned int prev_reg_val[hang_detect_regs_count];

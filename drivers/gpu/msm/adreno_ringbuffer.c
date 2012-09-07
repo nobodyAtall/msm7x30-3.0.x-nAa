@@ -135,7 +135,7 @@ adreno_ringbuffer_waitspace(struct adreno_ringbuffer *rb, unsigned int numcmds,
 			"rptr: 0x%x, wptr: 0x%x\n", rb->rptr, rb->wptr);
 			goto err;
 		}
-
+		continue;
 err:
 		if (!adreno_dump_and_recover(rb->device))
 				wait_time = jiffies + wait_timeout;
@@ -455,7 +455,7 @@ int adreno_ringbuffer_start(struct adreno_ringbuffer *rb, unsigned int init_ram)
 	adreno_ringbuffer_submit(rb);
 
 	/* idle device to validate ME INIT */
-	status = adreno_idle(device, KGSL_TIMEOUT_DEFAULT);
+	status = adreno_idle(device);
 
 	if (status == 0)
 		rb->flags |= KGSL_FLAGS_STARTED;
@@ -904,7 +904,7 @@ adreno_ringbuffer_issueibcmds(struct kgsl_device_private *dev_priv,
 	 * this is conservative but works reliably and is ok
 	 * even for performance simulations
 	 */
-	adreno_idle(device, KGSL_TIMEOUT_DEFAULT);
+	adreno_idle(device);
 #endif
 
 	return 0;
