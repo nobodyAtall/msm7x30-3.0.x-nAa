@@ -741,8 +741,6 @@ static void scorpion_pmu_reset(void *info)
 
 static struct arm_pmu scorpion_pmu = {
 	.handle_irq		= armv7pmu_handle_irq,
-	.request_pmu_irq	= msm_request_irq,
-	.free_pmu_irq		= msm_free_irq,
 	.enable			= scorpion_pmu_enable_event,
 	.disable		= scorpion_pmu_disable_event,
 	.read_counter		= armv7pmu_read_counter,
@@ -762,6 +760,9 @@ static const struct arm_pmu *__init armv7_scorpion_pmu_init(void)
 	scorpion_pmu.cache_map	= &armv7_scorpion_perf_cache_map;
 	scorpion_pmu.event_map	= &armv7_scorpion_perf_map;
 	scorpion_pmu.num_events	= armv7_read_num_pmnc_events();
+	/* Unicore can't use the percpu IRQ API. */
+	scorpion_pmu.request_pmu_irq	= armpmu_generic_request_irq;
+	scorpion_pmu.free_pmu_irq	= armpmu_generic_free_irq;
 	scorpion_clear_pmuregs();
 	return &scorpion_pmu;
 }
@@ -773,6 +774,8 @@ static const struct arm_pmu *__init armv7_scorpionmp_pmu_init(void)
 	scorpion_pmu.cache_map	= &armv7_scorpion_perf_cache_map;
 	scorpion_pmu.event_map	= &armv7_scorpion_perf_map;
 	scorpion_pmu.num_events	= armv7_read_num_pmnc_events();
+	scorpion_pmu.request_pmu_irq	= msm_request_irq;
+	scorpion_pmu.free_pmu_irq	= msm_free_irq;
 	scorpion_clear_pmuregs();
 	return &scorpion_pmu;
 }
