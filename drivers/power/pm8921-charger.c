@@ -269,6 +269,7 @@ struct pm8921_chg_chip {
 	enum pm8921_chg_hot_thr		hot_thr;
 	int				rconn_mohm;
 	bool				host_mode;
+	bool				has_dc_supply;
 	u8				active_path;
 	int				recent_reported_soc;
 };
@@ -1174,6 +1175,12 @@ static int pm_power_get_property_mains(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_PRESENT:
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = 0;
+
+		if (the_chip->has_dc_supply) {
+			val->intval = 1;
+			return 0;
+		}
+
 		if (charging_disabled)
 			return 0;
 
@@ -1648,8 +1655,7 @@ void pm8921_charger_vbus_draw(unsigned int mA)
 	 */
 	if (!get_prop_batt_present(the_chip)
 		&& !is_dc_chg_plugged_in(the_chip)) {
-		if (get_prop_batt_current(the_chip) <
-				the_chip->min_voltage_mv) {
+		if (!the_chip->has_dc_supply) {
 			pr_err("rejected: no other power source connected\n");
 			return;
 		}
@@ -3992,6 +3998,7 @@ static int __devinit pm8921_charger_probe(struct platform_device *pdev)
 	chip->cold_thr = pdata->cold_thr;
 	chip->hot_thr = pdata->hot_thr;
 	chip->rconn_mohm = pdata->rconn_mohm;
+	chip->has_dc_supply = pdata->has_dc_supply;
 
 	rc = pm8921_chg_hw_init(chip);
 	if (rc) {
