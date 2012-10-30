@@ -62,6 +62,9 @@ enum pm8921_usb_debounce_time {
  * @uvd_thresh_voltage:	the USB falling UVD threshold (mV) (PM8917 only)
  * @resume_voltage_delta:	the (mV) drop to wait for before resume charging
  *				after the battery has been fully charged
+ * @resume_charge_percent:	the % SOC the charger will drop to after the
+ *				battery is fully charged before resuming
+ *				charging.
  * @term_current:	the charger current (mA) at which EOC happens
  * @cool_temp:		the temperature (degC) at which the battery is
  *			considered cool charging current and voltage is reduced.
@@ -120,6 +123,7 @@ struct pm8921_charger_platform_data {
 	unsigned int			min_voltage;
 	unsigned int			uvd_thresh_voltage;
 	unsigned int			resume_voltage_delta;
+	int				resume_charge_percent;
 	unsigned int			term_current;
 	int				cool_temp;
 	int				warm_temp;
