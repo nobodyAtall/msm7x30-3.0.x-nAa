@@ -360,7 +360,7 @@ u32 __branch_clk_disable_reg(const struct branch *clk, const char *name)
 {
 	u32 reg_val;
 
-	reg_val = readl_relaxed(clk->ctl_reg);
+	reg_val = clk->ctl_reg ? readl_relaxed(clk->ctl_reg) : 0;
 	if (clk->en_mask) {
 		reg_val &= ~(clk->en_mask);
 		writel_relaxed(reg_val, clk->ctl_reg);
