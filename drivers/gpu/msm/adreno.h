@@ -78,6 +78,7 @@ struct adreno_device {
 	unsigned int istore_size;
 	unsigned int pix_shader_start;
 	unsigned int ib_check_level;
+	unsigned int fast_hang_detect;
 };
 
 struct adreno_gpudev {
@@ -124,6 +125,10 @@ extern const unsigned int a220_registers[];
 extern const unsigned int a200_registers_count;
 extern const unsigned int a220_registers_count;
 
+extern unsigned int hang_detect_regs[];
+extern const unsigned int hang_detect_regs_count;
+
+
 int adreno_idle(struct kgsl_device *device, unsigned int timeout);
 void adreno_regread(struct kgsl_device *device, unsigned int offsetwords,
 				unsigned int *value);
@@ -142,6 +147,9 @@ void *adreno_snapshot(struct kgsl_device *device, void *snapshot, int *remain,
 		int hang);
 
 int adreno_dump_and_recover(struct kgsl_device *device);
+
+unsigned int adreno_hang_detect(struct kgsl_device *device,
+						unsigned int *prev_reg_val);
 
 static inline int adreno_is_a200(struct adreno_device *adreno_dev)
 {
