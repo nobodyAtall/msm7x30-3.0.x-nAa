@@ -154,7 +154,7 @@ static void kgsl_iommu_setstate(struct kgsl_device *device,
 		 *  specified page table
 		 */
 		if (mmu->hwpagetable != pagetable) {
-			kgsl_idle(device, KGSL_TIMEOUT_DEFAULT);
+			kgsl_idle(device);
 			kgsl_detach_pagetable_iommu_domain(mmu);
 			mmu->hwpagetable = pagetable;
 			if (mmu->hwpagetable)
@@ -308,10 +308,10 @@ kgsl_iommu_get_current_ptbase(struct kgsl_device *device)
 {
 	/* Current base is always the hwpagetables domain as we
 	 * do not use per process pagetables right not for iommu.
-	 * This will change when we switch to per process pagetables.
-	 */
+	 * This will change when we switch to per process pagetables.*/
 	return (unsigned int)device->mmu.hwpagetable->priv;
 }
+
 
 struct kgsl_mmu_ops iommu_ops = {
 	.mmu_init = kgsl_iommu_init,

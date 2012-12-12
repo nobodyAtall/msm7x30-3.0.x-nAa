@@ -520,7 +520,8 @@ static void kgsl_gpummu_default_setstate(struct kgsl_device *device,
 		return;
 
 	if (flags & KGSL_MMUFLAGS_PTUPDATE) {
-		kgsl_idle(device, KGSL_TIMEOUT_DEFAULT);
+
+		kgsl_idle(device);
 		gpummu_pt = device->mmu.hwpagetable->priv;
 		kgsl_regwrite(device, MH_MMU_PT_BASE,
 			gpummu_pt->base.gpuaddr);
@@ -615,7 +616,7 @@ static int kgsl_gpummu_start(struct kgsl_device *device)
 	kgsl_regwrite(device, MH_MMU_CONFIG, mmu->config);
 
 	/* idle device */
-	kgsl_idle(device,  KGSL_TIMEOUT_DEFAULT);
+	kgsl_idle(device);
 
 	/* enable axi interrupts */
 	kgsl_regwrite(device, MH_INTERRUPT_MASK,
