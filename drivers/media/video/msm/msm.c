@@ -1466,7 +1466,9 @@ static int msm_open(struct file *f)
 {
 	int i;
 	int rc = -EINVAL;
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	int ion_client_created = 0;
+#endif
 	/*struct msm_isp_ops *p_isp = 0;*/
 	/* get the video device */
 	struct msm_cam_v4l2_device *pcam  = video_drvdata(f);
