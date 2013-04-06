@@ -324,7 +324,11 @@ uint32_t socinfo_get_platform_subtype(void)
 
 enum msm_cpu socinfo_get_msm_cpu(void)
 {
+#ifdef CONFIG_ARCH_MSM7X30
+	return MSM_CPU_7X30;
+#else
 	return cur_cpu;
+#endif
 }
 EXPORT_SYMBOL_GPL(socinfo_get_msm_cpu);
 
