@@ -146,6 +146,7 @@ struct msm_fb_data_type {
 	__u32 bl_level;
 
 	struct platform_device *pdev;
+	struct platform_device *panel_pdev;
 
 	__u32 var_xres;
 	__u32 var_yres;

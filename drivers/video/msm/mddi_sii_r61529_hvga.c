@@ -1,8 +1,8 @@
-/* drivers/video/msm/mddi_hitachi_r61529_hvga.c
+/* drivers/video/msm/mddi_sii_r61529_hvga.c
  *
- * Copyright (C) 2010 Sony Ericsson Mobile Communications AB.
+ * Copyright (C) 2011 Sony Ericsson Mobile Communications AB.
  *
- * Author: Johan Olson <johan.olson@sonyericsson.com>
+ * Author: Macro Luo <macro.luo@sonyericsson.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2, as
@@ -16,25 +16,17 @@
 #include <linux/fb.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
-#include <generated/autoconf.h>
-#include <linux/mddi_hitachi_r61529_hvga.h>
-
-#if defined(CONFIG_MACH_SEMC_SATSUMA) || defined(CONFIG_MACH_SEMC_SMULTRON)
-	#define REFRESH_RATE 6700
-#elif defined(CONFIG_MACH_SEMC_MANGO)
-	#define REFRESH_RATE 6200
-#else
-	#define REFRESH_RATE 6500
-#endif
+#include <linux/autoconf.h>
+#include <linux/mddi_sii_r61529_hvga.h>
 
 /* Internal version number */
 #define MDDI_DRIVER_VERSION 0x0004
 
 /* DISPLAY ID value */
-#define MDDI_HITACHI_CELL_ID 0xFA
+#define MDDI_SII_CELL_ID 0xFA
 
 /* DISPLAY DRIVERIC ID value */
-#define MDDI_HITACHI_DISPLAY_DRIVER_IC_ID 0x01
+#define MDDI_SII_DISPLAY_DRIVER_IC_ID 0x06
 
 /* Frame time, used for delays */
 #define MDDI_FRAME_TIME 13
@@ -50,7 +42,7 @@ enum lcd_registers {
 	LCD_REG_REVISION_ID = 0xA8
 };
 
-enum mddi_hitachi_lcd_state {
+enum mddi_sii_lcd_state {
 	LCD_STATE_OFF,
 	LCD_STATE_POWER_ON,
 	LCD_STATE_DISPLAY_OFF,
@@ -72,11 +64,11 @@ struct panel_ids {
 };
 
 
-struct hitachi_record {
-	struct hitachi_hvga_platform_data *pdata;
+struct sii_record {
+	struct sii_hvga_platform_data *pdata;
 	struct mutex mddi_mutex;
 	int power_ctrl;
-	enum mddi_hitachi_lcd_state lcd_state;
+	enum mddi_sii_lcd_state lcd_state;
 	struct coords last_window;
 	struct platform_device *pdev;
 	struct panel_ids pid;
@@ -96,7 +88,7 @@ static u32 dbc_control_off_data[DBC_CONTROL_SIZE] = {
 		0x00000010, 0x00000037, 0x0000005A, 0x00000087, 0X000000BE,
 		0x000000FF, 0x00000000, 0x00000000, 0x00000000, 0X00000000};
 
-#ifdef MDDI_HITACHI_DISPLAY_INITIAL
+#ifdef MDDI_SII_DISPLAY_INITIAL
 #define GAMMA_SETTING_SIZE 6
 static u32 gamma_setting_A[GAMMA_SETTING_SIZE] = {
 	0x1F150C00, 0x273B482E, 0x0104101A, 0x1F150C00, 0x273B482E, 0x0104101A};
@@ -106,7 +98,7 @@ static u32 gamma_setting_C[GAMMA_SETTING_SIZE] = {
 	0x1F150C00, 0x273B482E, 0x0104101A, 0x1F150C00, 0x273B482E, 0x0104101A};
 #endif
 
-static void hitachi_lcd_dbc_on(struct hitachi_record *rd)
+static void sii_lcd_dbc_on(struct sii_record *rd)
 {
 	if (rd->pdata->dbc_on) {
 		/* Manufacture Command Access Protect */
@@ -126,7 +118,7 @@ static void hitachi_lcd_dbc_on(struct hitachi_record *rd)
 	}
 }
 
-static void hitachi_lcd_dbc_off(struct hitachi_record *rd)
+static void sii_lcd_dbc_off(struct sii_record *rd)
 {
 	if (rd->pdata->dbc_on) {
 		/* Manufacture Command Access Protect */
@@ -146,7 +138,7 @@ static void hitachi_lcd_dbc_off(struct hitachi_record *rd)
 	}
 }
 
-static void hitachi_lcd_window_address_set(enum lcd_registers reg,
+static void sii_lcd_window_address_set(enum lcd_registers reg,
 						u16 start, u16 stop)
 {
 	uint32 para;
@@ -157,8 +149,8 @@ static void hitachi_lcd_window_address_set(enum lcd_registers reg,
 	mddi_queue_register_write(reg, para, TRUE, 0);
 }
 
-#ifdef MDDI_HITACHI_DISPLAY_INITIAL
-static void hitachi_lcd_driver_init(struct platform_device *pdev)
+#ifdef MDDI_SII_DISPLAY_INITIAL
+static void sii_lcd_driver_init(struct platform_device *pdev)
 {
 	struct msm_fb_panel_data *panel;
 
@@ -241,16 +233,20 @@ static void hitachi_lcd_driver_init(struct platform_device *pdev)
 }
 #endif
 
-static void hitachi_lcd_window_adjust(uint16 x1, uint16 x2,
+static void sii_lcd_window_adjust(uint16 x1, uint16 x2,
 					uint16 y1, uint16 y2)
 {
-	hitachi_lcd_window_address_set(LCD_REG_COLUMN_ADDRESS, x1, x2);
-	hitachi_lcd_window_address_set(LCD_REG_PAGE_ADDRESS, y1, y2);
+	sii_lcd_window_address_set(LCD_REG_COLUMN_ADDRESS, x1, x2);
+	sii_lcd_window_address_set(LCD_REG_PAGE_ADDRESS, y1, y2);
 	mddi_queue_register_write(0x3C, 0x00, TRUE, 0);
 }
 
-static void hitachi_lcd_exit_sleep(struct hitachi_record *rd)
+static void sii_lcd_exit_sleep(struct sii_record *rd)
 {
+	/* Page Address Set */
+	mddi_queue_register_write(0x2A, 0x0000013F, TRUE, 0);
+	mddi_queue_register_write(0x2B, 0x000001DF, TRUE, 0);
+
 	/*Address Mode Set */
 	mddi_queue_register_write(0x36, 0x00, TRUE, 0);
 
@@ -266,7 +262,7 @@ static void hitachi_lcd_exit_sleep(struct hitachi_record *rd)
 	mddi_queue_register_write(0x35, 0x00, TRUE, 0);
 }
 
-static void hitachi_lcd_enter_sleep(void)
+static void sii_lcd_enter_sleep(void)
 {
 	/* Set tear off */
 	mddi_queue_register_write(0x34, 0x00, TRUE, 0);
@@ -276,48 +272,48 @@ static void hitachi_lcd_enter_sleep(void)
 	mddi_wait(100);/* >90ms */
 }
 
-static void hitachi_lcd_display_on(void)
+static void sii_lcd_display_on(void)
 {
 	mddi_queue_register_write(0x29, 0x00, TRUE, 0);
 }
 
-static void hitachi_lcd_display_off(void)
+static void sii_lcd_display_off(void)
 {
 	mddi_queue_register_write(0x28, 0x00, TRUE, 0);
 	mddi_wait(21); /* >20 ms */
 }
 
-static void hitachi_lcd_enter_deepstandby(void)
+static void sii_lcd_enter_deepstandby(void)
 {
 	mddi_queue_register_write(0xB0, 0x00, TRUE, 0);
 	mddi_queue_register_write(0xB1, 0x01, TRUE, 0);
 	mddi_wait(2); /* >1 ms */
 }
 
-static void hitachi_toggle_reset(struct hitachi_record *rd)
+static void sii_toggle_reset(struct sii_record *rd)
 {
 	if (rd->pdata->exit_deep_standby)
 		rd->pdata->exit_deep_standby();
 }
 
-static void hitachi_lcd_exit_deepstandby(struct hitachi_record *rd)
+static void sii_lcd_exit_deepstandby(struct sii_record *rd)
 {
-	hitachi_toggle_reset(rd);
+	sii_toggle_reset(rd);
 }
 
-static void hitachi_power_on(struct hitachi_record *rd)
+static void sii_power_on(struct sii_record *rd)
 {
 	if (rd->pdata->power_on)
 		rd->pdata->power_on();
 }
 
-static void hitachi_power_off(struct hitachi_record *rd)
+static void sii_power_off(struct sii_record *rd)
 {
 	if (rd->pdata->power_off)
 		rd->pdata->power_off();
 }
 
-static struct hitachi_record *get_hitachi_record_from_mfd(
+static struct sii_record *get_sii_record_from_mfd(
 						struct platform_device *pdev)
 {
 	struct msm_fb_data_type *mfd;
@@ -333,12 +329,12 @@ static struct hitachi_record *get_hitachi_record_from_mfd(
 	return platform_get_drvdata(mfd->panel_pdev);
 }
 
-static int mddi_hitachi_ic_on_panel_off(struct platform_device *pdev)
+static int mddi_sii_ic_on_panel_off(struct platform_device *pdev)
 {
 	int ret = 0;
-	struct hitachi_record *rd;
+	struct sii_record *rd;
 
-	rd = get_hitachi_record_from_mfd(pdev);
+	rd = get_sii_record_from_mfd(pdev);
 	if (!rd) {
 		ret = -ENODEV;
 		goto error;
@@ -348,26 +344,26 @@ static int mddi_hitachi_ic_on_panel_off(struct platform_device *pdev)
 	if (rd->power_ctrl) {
 		switch (rd->lcd_state) {
 		case LCD_STATE_OFF:
-			hitachi_power_on(rd);
+			sii_power_on(rd);
 			rd->lcd_state = LCD_STATE_POWER_ON;
 			break;
 
 		case LCD_STATE_POWER_ON:
-			hitachi_lcd_exit_sleep(rd);
-#ifdef MDDI_HITACHI_DISPLAY_INITIAL
-			hitachi_lcd_driver_init(pdev);
+			sii_lcd_exit_sleep(rd);
+#ifdef MDDI_SII_DISPLAY_INITIAL
+			sii_lcd_driver_init(pdev);
 #endif
-			hitachi_lcd_dbc_on(rd);
+			sii_lcd_dbc_on(rd);
 			rd->lcd_state = LCD_STATE_DISPLAY_OFF;
 			break;
 
 		case LCD_STATE_SLEEP:
-			hitachi_lcd_exit_deepstandby(rd);
-			hitachi_lcd_exit_sleep(rd);
-#ifdef MDDI_HITACHI_DISPLAY_INITIAL
-			hitachi_lcd_driver_init(pdev);
+			sii_lcd_exit_deepstandby(rd);
+			sii_lcd_exit_sleep(rd);
+#ifdef MDDI_SII_DISPLAY_INITIAL
+			sii_lcd_driver_init(pdev);
 #endif
-			hitachi_lcd_dbc_on(rd);
+			sii_lcd_dbc_on(rd);
 			rd->lcd_state = LCD_STATE_DISPLAY_OFF;
 			break;
 
@@ -380,12 +376,12 @@ error:
 	return ret;
 }
 
-static int mddi_hitachi_ic_on_panel_on(struct platform_device *pdev)
+static int mddi_sii_ic_on_panel_on(struct platform_device *pdev)
 {
 	int ret = 0;
-	struct hitachi_record *rd;
+	struct sii_record *rd;
 
-	rd = get_hitachi_record_from_mfd(pdev);
+	rd = get_sii_record_from_mfd(pdev);
 	if (!rd) {
 		ret = -ENODEV;
 		goto error;
@@ -395,28 +391,28 @@ static int mddi_hitachi_ic_on_panel_on(struct platform_device *pdev)
 	if (rd->power_ctrl) {
 		switch (rd->lcd_state) {
 		case LCD_STATE_POWER_ON:
-			hitachi_lcd_exit_sleep(rd);
-#ifdef MDDI_HITACHI_DISPLAY_INITIAL
-			hitachi_lcd_driver_init(pdev);
+			sii_lcd_exit_sleep(rd);
+#ifdef MDDI_SII_DISPLAY_INITIAL
+			sii_lcd_driver_init(pdev);
 #endif
-			hitachi_lcd_dbc_on(rd);
-			hitachi_lcd_display_on();
+			sii_lcd_dbc_on(rd);
+			sii_lcd_display_on();
 			rd->lcd_state = LCD_STATE_ON;
 			break;
 
 		case LCD_STATE_SLEEP:
-			hitachi_lcd_exit_deepstandby(rd);
-			hitachi_lcd_exit_sleep(rd);
-#ifdef MDDI_HITACHI_DISPLAY_INITIAL
-			hitachi_lcd_driver_init(pdev);
+			sii_lcd_exit_deepstandby(rd);
+			sii_lcd_exit_sleep(rd);
+#ifdef MDDI_SII_DISPLAY_INITIAL
+			sii_lcd_driver_init(pdev);
 #endif
-			hitachi_lcd_dbc_on(rd);
-			hitachi_lcd_display_on();
+			sii_lcd_dbc_on(rd);
+			sii_lcd_display_on();
 			rd->lcd_state = LCD_STATE_ON;
 			break;
 
 		case LCD_STATE_DISPLAY_OFF:
-			hitachi_lcd_display_on();
+			sii_lcd_display_on();
 			rd->lcd_state = LCD_STATE_ON;
 			break;
 
@@ -429,12 +425,12 @@ error:
 	return ret;
 }
 
-static int mddi_hitachi_ic_off_panel_off(struct platform_device *pdev)
+static int mddi_sii_ic_off_panel_off(struct platform_device *pdev)
 {
 	int ret = 0;
-	struct hitachi_record *rd;
+	struct sii_record *rd;
 
-	rd = get_hitachi_record_from_mfd(pdev);
+	rd = get_sii_record_from_mfd(pdev);
 	if (!rd) {
 		ret = -ENODEV;
 		goto error;
@@ -444,27 +440,27 @@ static int mddi_hitachi_ic_off_panel_off(struct platform_device *pdev)
 	if (rd->power_ctrl) {
 		switch (rd->lcd_state) {
 		case LCD_STATE_POWER_ON:
-			hitachi_power_off(rd);
+			sii_power_off(rd);
 			rd->lcd_state = LCD_STATE_OFF;
 			break;
 
 		case LCD_STATE_ON:
-			hitachi_lcd_display_off();
-			hitachi_lcd_dbc_off(rd);
-			hitachi_lcd_enter_sleep();
-			hitachi_lcd_enter_deepstandby();
+			sii_lcd_display_off();
+			sii_lcd_dbc_off(rd);
+			sii_lcd_enter_sleep();
+			sii_lcd_enter_deepstandby();
 			rd->lcd_state = LCD_STATE_SLEEP;
 			break;
 
 		case LCD_STATE_SLEEP:
-			hitachi_power_off(rd);
+			sii_power_off(rd);
 			rd->lcd_state = LCD_STATE_OFF;
 			break;
 
 		case LCD_STATE_DISPLAY_OFF:
-			hitachi_lcd_dbc_off(rd);
-			hitachi_lcd_enter_sleep();
-			hitachi_lcd_enter_deepstandby();
+			sii_lcd_dbc_off(rd);
+			sii_lcd_enter_sleep();
+			sii_lcd_enter_deepstandby();
 			rd->lcd_state = LCD_STATE_SLEEP;
 			break;
 
@@ -484,7 +480,7 @@ static ssize_t show_driver_info(struct device *dev_p,
 			struct device_attribute *attr,
 			char *buf)
 {
-	return snprintf(buf, PAGE_SIZE, "R61529 Hitachi HVGA, drv ver:0x%x\n",
+	return snprintf(buf, PAGE_SIZE, "R61529 Sii HVGA, drv ver:0x%x\n",
 							MDDI_DRIVER_VERSION);
 }
 
@@ -497,11 +493,11 @@ static void lcd_attribute_register(struct platform_device *pdev)
 
 	ret = device_create_file(&pdev->dev, &dev_attr_display_driver_info);
 	if (ret != 0)
-		pr_err("Failed to register display_driver_version"
+		dev_err(&pdev->dev, "Failed to register display_driver_version"
 						"attributes (%d)\n", ret);
 }
 
-static int check_panel_ids(struct hitachi_record *rd)
+static int check_panel_ids(struct sii_record *rd)
 {
 	int ret = 0;
 
@@ -511,13 +507,13 @@ static int check_panel_ids(struct hitachi_record *rd)
 					&rd->pid.driver_ic_id,
 					1, MDDI_HOST_PRIM);
 	if (ret < 0) {
-		pr_err("mddi_hitachi_hvga: Failed to read Display ID\n");
+		pr_err("mddi_sii_hvga: Failed to read Display ID\n");
 		ret = -ENODEV;
 		goto error;
 	}
 	if ((rd->pid.driver_ic_id & 0xFF) !=
-			MDDI_HITACHI_DISPLAY_DRIVER_IC_ID) {
-		pr_err("mddi_hitachi_hvga: Detected a non-Hitachi display\n");
+			MDDI_SII_DISPLAY_DRIVER_IC_ID) {
+		pr_err("mddi_sii_hvga: Detected a non-Sii display\n");
 		ret = -ENODEV;
 		goto error;
 	}
@@ -526,13 +522,13 @@ static int check_panel_ids(struct hitachi_record *rd)
 					&rd->pid.module_id,
 					1, MDDI_HOST_PRIM);
 	if (ret < 0)
-		pr_err("mddi_hitachi_hvga: Failed to read LCD_REG_MODULE_ID\n");
+		pr_err("mddi_sii_hvga: Failed to read LCD_REG_MODULE_ID\n");
 
 	ret = mddi_host_register_read(LCD_REG_REVISION_ID,
 					&rd->pid.revision_id,
 					1, MDDI_HOST_PRIM);
 	if (ret < 0)
-		pr_err("mddi_hitachi_hvga: "
+		pr_err("mddi_sii_hvga: "
 				"Failed to read LCD_REG_REVISION_ID\n");
 
 	pr_info("Found display with module ID = 0x%x, "
@@ -548,23 +544,23 @@ error:
 	return ret;
 }
 
-static int mddi_hitachi_lcd_probe(struct platform_device *pdev)
+static int mddi_sii_lcd_probe(struct platform_device *pdev)
 {
 	int ret = -ENODEV;
-	struct hitachi_record *rd;
+	struct sii_record *rd;
 
 	if (!pdev) {
-		pr_err("%s: no platform_device\n", __func__);
+		dev_err(&pdev->dev, "%s: no platform_device\n", __func__);
 		ret = -ENODEV;
 		goto exit_point;
 	}
 	if (!pdev->dev.platform_data) {
-		pr_err("%s: no platform data\n", __func__);
+		dev_err(&pdev->dev, "%s: no platform data\n", __func__);
 		ret = -ENODEV;
 		goto exit_point;
 	}
 
-	rd = kzalloc(sizeof(struct hitachi_record), GFP_KERNEL);
+	rd = kzalloc(sizeof(struct sii_record), GFP_KERNEL);
 	if (rd == NULL) {
 		ret = -ENOMEM;
 		goto exit_point;
@@ -582,18 +578,18 @@ static int mddi_hitachi_lcd_probe(struct platform_device *pdev)
 		rd->pdata->panel_data->panel_info.mddi.vdopkt =
 						MDDI_DEFAULT_PRIM_PIX_ATTR;
 		rd->pdata->panel_data->panel_info.lcd.vsync_enable = TRUE;
-		rd->pdata->panel_data->panel_info.lcd.refx100 = REFRESH_RATE;
+		rd->pdata->panel_data->panel_info.lcd.refx100 = 6500;
 		rd->pdata->panel_data->panel_info.lcd.v_back_porch = 8;
 		rd->pdata->panel_data->panel_info.lcd.v_front_porch = 8;
 		rd->pdata->panel_data->panel_info.lcd.v_pulse_width = 0;
 		rd->pdata->panel_data->panel_info.lcd.hw_vsync_mode = TRUE;
 		rd->pdata->panel_data->panel_info.lcd.vsync_notifier_period = 0;
-		rd->pdata->panel_data->on  = mddi_hitachi_ic_on_panel_off;
+		rd->pdata->panel_data->on  = mddi_sii_ic_on_panel_off;
 		rd->pdata->panel_data->controller_on_panel_on =
-						mddi_hitachi_ic_on_panel_on;
-		rd->pdata->panel_data->off = mddi_hitachi_ic_off_panel_off;
+						mddi_sii_ic_on_panel_on;
+		rd->pdata->panel_data->off = mddi_sii_ic_off_panel_off;
 		rd->pdata->panel_data->window_adjust =
-						hitachi_lcd_window_adjust;
+						sii_lcd_window_adjust;
 		rd->pdata->panel_data->power_on_panel_at_pan = 0;
 		pdev->dev.platform_data = rd->pdata->panel_data;
 
@@ -603,7 +599,7 @@ static int mddi_hitachi_lcd_probe(struct platform_device *pdev)
 		/* Add SYSFS to module */
 		lcd_attribute_register(pdev);
 
-		printk(KERN_INFO "%s: Probe success!", __func__);
+		dev_info(&pdev->dev, "%s: Probe success!", __func__);
 		ret = 0;
 	} else {
 		kfree(rd);
@@ -612,38 +608,37 @@ exit_point:
 	return ret;
 }
 
-static int __devexit mddi_hitachi_lcd_remove(struct platform_device *pdev)
+static int __devexit mddi_sii_lcd_remove(struct platform_device *pdev)
 {
-	struct hitachi_record *rd;
+	struct sii_record *rd;
 
 	device_remove_file(&pdev->dev, &dev_attr_display_driver_info);
 	rd = platform_get_drvdata(pdev);
-	if (rd)
-		kfree(rd);
+	kfree(rd);
 	return 0;
 };
 
 static struct platform_driver this_driver = {
-	.probe  = mddi_hitachi_lcd_probe,
-	.remove = __devexit_p(mddi_hitachi_lcd_remove),
+	.probe  = mddi_sii_lcd_probe,
+	.remove = __devexit_p(mddi_sii_lcd_remove),
 	.driver = {
-		.name = MDDI_HITACH_R61529_HVGA_NAME,
+		.name = MDDI_SII_R61529_HVGA_NAME,
 	},
 };
 
-static int __init mddi_hitachi_lcd_init(void)
+static int __init mddi_sii_lcd_init(void)
 {
 	return platform_driver_register(&this_driver);
 }
 
-static void __exit mddi_hitachi_lcd_exit(void)
+static void __exit mddi_sii_lcd_exit(void)
 {
 	platform_driver_unregister(&this_driver);
 }
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("johan.olson@sonyericsson.com");
-MODULE_DESCRIPTION("Driver for Renesas R61529 with Hitachi HVGA panel");
+MODULE_AUTHOR("macro.luo@sonyericsson.com");
+MODULE_DESCRIPTION("Driver for Renesas R61529 with SII HVGA panel");
 
-module_init(mddi_hitachi_lcd_init);
-module_exit(mddi_hitachi_lcd_exit);
+module_init(mddi_sii_lcd_init);
+module_exit(mddi_sii_lcd_exit);
