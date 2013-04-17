@@ -70,7 +70,7 @@
 #include <mach/msm_tsif.h>
 #include <mach/socinfo.h>
 #include <mach/msm_memtypes.h>
-#include <linux/akm8975.h>
+#include <linux/i2c/akm8975.h>
 #ifdef CONFIG_TOUCHSCREEN_CYTTSP_CORE
 #include <linux/cyttsp.h>
 #endif
