@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, 2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -9,9 +9,13 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ *
  */
 
-#include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/interrupt.h>
 #include <mach/irqs.h>
@@ -20,67 +24,6 @@
 
 #define ON  1
 #define OFF 0
-
-static const char *vfe_general_cmd[] = {
-	"START",  /* 0 */
-	"RESET",
-	"AXI_INPUT_CONFIG",
-	"CAMIF_CONFIG",
-	"AXI_OUTPUT_CONFIG",
-	"BLACK_LEVEL_CONFIG",  /* 5 */
-	"ROLL_OFF_CONFIG",
-	"DEMUX_CHANNEL_GAIN_CONFIG",
-	"DEMOSAIC_CONFIG",
-	"FOV_CROP_CONFIG",
-	"MAIN_SCALER_CONFIG",  /* 10 */
-	"WHITE_BALANCE_CONFIG",
-	"COLOR_CORRECTION_CONFIG",
-	"LA_CONFIG",
-	"RGB_GAMMA_CONFIG",
-	"CHROMA_ENHAN_CONFIG",  /* 15 */
-	"CHROMA_SUPPRESSION_CONFIG",
-	"ASF_CONFIG",
-	"SCALER2Y_CONFIG",
-	"SCALER2CbCr_CONFIG",
-	"CHROMA_SUBSAMPLE_CONFIG",  /* 20 */
-	"FRAME_SKIP_CONFIG",
-	"OUTPUT_CLAMP_CONFIG",
-	"TEST_GEN_START",
-	"UPDATE",
-	"OUTPUT1_ACK",  /* 25 */
-	"OUTPUT2_ACK",
-	"EPOCH1_ACK",
-	"EPOCH2_ACK",
-	"STATS_AUTOFOCUS_ACK",
-	"STATS_WB_EXP_ACK",  /* 30 */
-	"BLACK_LEVEL_UPDATE",
-	"DEMUX_CHANNEL_GAIN_UPDATE",
-	"DEMOSAIC_BPC_UPDATE",
-	"DEMOSAIC_ABF_UPDATE",
-	"FOV_CROP_UPDATE",  /* 35 */
-	"WHITE_BALANCE_UPDATE",
-	"COLOR_CORRECTION_UPDATE",
-	"LA_UPDATE",
-	"RGB_GAMMA_UPDATE",
-	"CHROMA_ENHAN_UPDATE",  /* 40 */
-	"CHROMA_SUPPRESSION_UPDATE",
-	"MAIN_SCALER_UPDATE",
-	"SCALER2CbCr_UPDATE",
-	"SCALER2Y_UPDATE",
-	"ASF_UPDATE",  /* 45 */
-	"FRAME_SKIP_UPDATE",
-	"CAMIF_FRAME_UPDATE",
-	"STATS_AUTOFOCUS_UPDATE",
-	"STATS_WB_EXP_UPDATE",
-	"STOP",  /* 50 */
-	"GET_HW_VERSION",
-	"STATS_SETTING",
-	"STATS_AUTOFOCUS_START",
-	"STATS_AUTOFOCUS_STOP",
-	"STATS_WB_EXP_START",  /* 55 */
-	"STATS_WB_EXP_STOP",
-	"ASYNC_TIMER_SETTING",
-};
 
 static void     *vfe_syncdata;
 
@@ -122,10 +65,10 @@ static void vfe_config_axi(int mode,
 
 			for (j = 0; j < ao->output1.fragmentCount; j++) {
 
-				*p1 = regptr->paddr + regptr->info.planar0_off;
+				*p1 = regptr->paddr + regptr->info.y_off;
 				p1++;
 
-				*p2 = regptr->paddr + regptr->info.planar1_off;
+				*p2 = regptr->paddr + regptr->info.cbcr_off;
 				p2++;
 			}
 			regptr++;
@@ -144,16 +87,15 @@ static void vfe_config_axi(int mode,
 
 			CDBG("config_axi: O2, phy = 0x%lx, y_off = %d, "\
 			     "cbcr_off = %d\n", regptr->paddr,
-				regptr->info.planar0_off,
-				regptr->info.planar1_off);
+			     regptr->info.y_off, regptr->info.cbcr_off);
 
 			for (j = 0; j < ao->output2.fragmentCount; j++) {
 
-				*p1 = regptr->paddr + regptr->info.planar0_off;
+				*p1 = regptr->paddr + regptr->info.y_off;
 				CDBG("vfe_config_axi: p1 = 0x%x\n", *p1);
 				p1++;
 
-				*p2 = regptr->paddr + regptr->info.planar1_off;
+				*p2 = regptr->paddr + regptr->info.cbcr_off;
 				CDBG("vfe_config_axi: p2 = 0x%x\n", *p2);
 				p2++;
 			}
@@ -175,15 +117,15 @@ static void vfe_config_axi(int mode,
 
 		CDBG("config_axi: O1, phy = 0x%lx, y_off = %d, "\
 			 "cbcr_off = %d\n", regptr->paddr,
-			 regptr->info.planar0_off, regptr->info.planar1_off);
+			 regptr->info.y_off, regptr->info.cbcr_off);
 
 			for (j = 0; j < ao->output1.fragmentCount; j++) {
 
-				*p1 = regptr->paddr + regptr->info.planar0_off;
+				*p1 = regptr->paddr + regptr->info.y_off;
 				CDBG("vfe_config_axi: p1 = 0x%x\n", *p1);
 				p1++;
 
-				*p2 = regptr->paddr + regptr->info.planar1_off;
+				*p2 = regptr->paddr + regptr->info.cbcr_off;
 				CDBG("vfe_config_axi: p2 = 0x%x\n", *p2);
 				p2++;
 			}
@@ -195,15 +137,15 @@ static void vfe_config_axi(int mode,
 
 		CDBG("config_axi: O2, phy = 0x%lx, y_off = %d, "\
 			 "cbcr_off = %d\n", regptr1->paddr,
-			 regptr1->info.planar0_off, regptr1->info.planar1_off);
+			 regptr1->info.y_off, regptr1->info.cbcr_off);
 
 			for (j = 0; j < ao->output2.fragmentCount; j++) {
-				*p1 = regptr1->paddr +
-					regptr1->info.planar0_off;
+
+				*p1 = regptr1->paddr + regptr1->info.y_off;
 				CDBG("vfe_config_axi: p1 = 0x%x\n", *p1);
 				p1++;
-				*p2 = regptr1->paddr +
-					r1->info.planar1_off;
+
+				*p2 = regptr1->paddr + regptr1->info.cbcr_off;
 				CDBG("vfe_config_axi: p2 = 0x%x\n", *p2);
 				p2++;
 			}
@@ -233,7 +175,7 @@ static int vfe_proc_general(struct msm_vfe_command_8k *cmd)
 {
 	int rc = 0;
 
-	CDBG("%s: cmdID = %s\n", __func__, vfe_general_cmd[cmd->id]);
+	CDBG("%s: cmdID = %d\n", __func__, cmd->id);
 
 	switch (cmd->id) {
 	case VFE_CMD_ID_RESET:
@@ -690,9 +632,9 @@ static int vfe_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 		b = (struct msm_frame *)(cmd->value);
 		p = *(unsigned long *)data;
 
-			fack.ybufaddr[0] = (uint32_t) (p + b->planar0_off);
+			fack.ybufaddr[0] = (uint32_t) (p + b->y_off);
 
-			fack.chromabufaddr[0] = (uint32_t) (p + b->planar1_off);
+			fack.chromabufaddr[0] = (uint32_t) (p + b->cbcr_off);
 
 		if (b->path == OUTPUT_TYPE_P)
 			vfe_output_p_ack(&fack);
@@ -737,14 +679,9 @@ static int vfe_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 					__func__, __LINE__);
 			return -EFAULT;
 		}
-			/* Validate the data from user space */
-			if (axio.output2.fragmentCount <
-				VFE_MIN_NUM_FRAGMENTS_PER_FRAME ||
-				axio.output2.fragmentCount >
-				VFE_MAX_NUM_FRAGMENTS_PER_FRAME)
-				return -EINVAL;
 
 			vfe_config_axi(OUTPUT_2, axid, &axio);
+
 			axio.outputDataSize = 0;
 			vfe_axi_output_config(&axio);
 	}
@@ -760,16 +697,6 @@ static int vfe_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 					__func__, __LINE__);
 			return -EFAULT;
 		}
-			/* Validate the data from user space */
-			if (axio.output1.fragmentCount <
-				VFE_MIN_NUM_FRAGMENTS_PER_FRAME ||
-				axio.output1.fragmentCount >
-				VFE_MAX_NUM_FRAGMENTS_PER_FRAME ||
-				axio.output2.fragmentCount <
-				VFE_MIN_NUM_FRAGMENTS_PER_FRAME ||
-				axio.output2.fragmentCount >
-				VFE_MAX_NUM_FRAGMENTS_PER_FRAME)
-				return -EINVAL;
 
 			vfe_config_axi(OUTPUT_1_AND_2, axid, &axio);
 			vfe_axi_output_config(&axio);
@@ -785,17 +712,6 @@ static int vfe_config(struct msm_vfe_cfg_cmd *cmd, void *data)
 					__func__, __LINE__);
 			return -EFAULT;
 		}
-			/* Validate the data from user space */
-			if (axio.output1.fragmentCount <
-				VFE_MIN_NUM_FRAGMENTS_PER_FRAME ||
-				axio.output1.fragmentCount >
-				VFE_MAX_NUM_FRAGMENTS_PER_FRAME ||
-				axio.output2.fragmentCount <
-				VFE_MIN_NUM_FRAGMENTS_PER_FRAME ||
-				axio.output2.fragmentCount >
-				VFE_MAX_NUM_FRAGMENTS_PER_FRAME)
-				return -EINVAL;
-
 			vfe_config_axi(OUTPUT_1_AND_3, axid, &axio);
 			axio.outputDataSize = 0;
 			vfe_axi_output_config(&axio);

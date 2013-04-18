@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ *
  */
 
 #ifndef __MSM_VFE8X_H__
@@ -223,7 +228,6 @@ enum VFE_RAW_PIXEL_DATA_SIZE {
 
 #define VFE_AXI_OUTPUT_BURST_LENGTH     4
 #define VFE_MAX_NUM_FRAGMENTS_PER_FRAME 4
-#define VFE_MIN_NUM_FRAGMENTS_PER_FRAME 1
 #define VFE_AXI_OUTPUT_CFG_FRAME_COUNT  3
 
 struct vfe_cmds_axi_out_per_component {

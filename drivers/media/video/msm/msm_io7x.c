@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ *
  */
 
 #include <linux/delay.h>
@@ -186,6 +191,9 @@ int msm_camio_sensor_clk_off(struct platform_device *pdev)
 
 void msm_camio_disable(struct platform_device *pdev)
 {
+	struct msm_camera_sensor_info *sinfo = pdev->dev.platform_data;
+	struct msm_camera_device_platform_data *camdev = sinfo->pdata;
+
 	iounmap(appbase);
 	release_mem_region(camio_ext.appphy, camio_ext.appsz);
 	msm_camio_clk_disable(CAMIO_VFE_CLK);

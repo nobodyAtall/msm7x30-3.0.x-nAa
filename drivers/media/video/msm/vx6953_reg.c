@@ -9,6 +9,11 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
+ *
  */
 
 
@@ -54,7 +59,7 @@ const struct reg_struct vx6953_reg_pat[2] = {
 		0x03,	/*REG = 0x0340 frame_length_lines_hi*/
 		0xf0,	/*REG = 0x0341 frame_length_lines_lo*/
 		0x0b,	/*REG = 0x0342  line_length_pck_hi*/
-		0x74,	/*REG = 0x0343  line_length_pck_lo*/
+		0xa5,	/*REG = 0x0343  line_length_pck_lo*/
 		0x03,	/*REG = 0x3005*/
 		0x00,	/*REG = 0x3010*/
 		0x01,	/*REG = 0x3011*/
