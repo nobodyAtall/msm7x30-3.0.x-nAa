@@ -62,6 +62,7 @@ allowed_warnings = set([
     "soc-core.c:1719",
     "xt_log.h:50",
     "vx6953.c:3124",
+    "tx.c:1804",
  ])
 
 # Capture the name of the object file, can find it.
