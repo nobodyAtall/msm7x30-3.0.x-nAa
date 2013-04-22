@@ -874,6 +874,21 @@ static struct msm_ssbi_platform_data msm7x30_ssbi_pm8058_pdata = {
 };
 #endif
 
+#ifdef CONFIG_INPUT_BMA150_NG
+static int bma150_gpio_setup(bool request)
+{
+	if (request)
+		return gpio_request(BMA150_GPIO, "bma150_irq");
+	else
+		gpio_free(BMA150_GPIO);
+	return 0;
+}
+
+struct bma150_platform_data bma150_ng_platform_data = {
+	.gpio_setup = bma150_gpio_setup,
+};
+#endif
+
 static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 	/*{
 		I2C_BOARD_INFO(MDDI_NOVATEK_I2C_NAME, 0x98 >> 1),
@@ -4058,21 +4073,6 @@ static void bma150_gpio_teardown(struct device *dev)
 static struct bma150_platform_data bma150_platform_data = {
 	.setup    = bma150_gpio_setup,
 	.teardown = bma150_gpio_teardown,
-};
-#endif
-
-#ifdef CONFIG_INPUT_BMA150_NG
-static int bma150_gpio_setup(bool request)
-{
-	if (request)
-		return gpio_request(BMA150_GPIO, "bma150_irq");
-	else
-		gpio_free(BMA150_GPIO);
-	return 0;
-}
-
-struct bma150_platform_data bma150_ng_platform_data = {
-	.gpio_setup = bma150_gpio_setup,
 };
 #endif
 
