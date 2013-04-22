@@ -36,10 +36,10 @@
  * @teardown: optional callback to invalidate the driver.
  *
 **/
-
+/*
 struct bma150_platform_data {
 	int (*setup)(struct device *);
 	void (*teardown)(struct device *);
 };
-
+*/
 #endif /* LINUX_BMA150_MODULE_H */
