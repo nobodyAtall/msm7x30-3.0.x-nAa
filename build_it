@@ -1,0 +1,21 @@
+### select toolchain
+## GCC 4.4.3
+CUR_TC=/home/doomlord/android/system-cm10.1/prebuilt/linux-x86/toolchain/arm-eabi-4.4.3/bin/
+## GCC 4.6 Linaro
+##CUR_TC=/home/doomlord/android-toolchain-eabi-linaro-4.6-2011.10/bin/
+## GCC 4.7 Linaro
+##CUR_TC=/home/doomlord/android-toolchain-eabi-linaro-4.7-2013.01/bin/
+
+### compile kernel
+ARCH=arm CROSS_COMPILE=${CUR_TC}arm-eabi- make -j8
+
+echo "checking for compiled kernel..."
+if [ -f arch/arm/boot/zImage ]
+then
+
+mkdir -p ../final_files
+
+### copy zImage
+cp arch/arm/boot/zImage ../final_files/.
+
+fi

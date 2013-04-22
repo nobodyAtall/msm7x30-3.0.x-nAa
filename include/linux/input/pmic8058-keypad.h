@@ -1,4 +1,4 @@
-/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -26,20 +26,36 @@
  * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#ifndef LINUX_BMA150_MODULE_H
-#define LINUX_BMA150_MODULE_H
 
-/**
- * struct bma150_platform_data - data to set up bma150 driver
- *
- * @setup: optional callback to activate the driver.
- * @teardown: optional callback to invalidate the driver.
- *
-**/
+#ifndef __PMIC8058_KEYPAD_H__
+#define __PMIC8058_KEYPAD_H__
+
+#include <linux/input/matrix_keypad.h>
+
 /*
-struct bma150_platform_data {
-	int (*setup)(struct device *);
-	void (*teardown)(struct device *);
+ * NOTE: Assumption of maximum of five revisions
+ * of PMIC8058 chip.
+ */
+#define MAX_PM8058_REVS		0x5
+
+struct pmic8058_keypad_data {
+	const struct matrix_keymap_data *keymap_data;
+
+	const char *input_name;
+	const char *input_phys_device;
+
+	unsigned int num_cols;
+	unsigned int num_rows;
+
+	unsigned int rows_gpio_start;
+	unsigned int cols_gpio_start;
+
+	unsigned int debounce_ms[MAX_PM8058_REVS];
+	unsigned int scan_delay_ms;
+	unsigned int row_hold_ns;
+
+	unsigned int wakeup;
+	unsigned int rep;
 };
-*/
-#endif /* LINUX_BMA150_MODULE_H */
+
+#endif /*__PMIC8058_KEYPAD_H__ */
