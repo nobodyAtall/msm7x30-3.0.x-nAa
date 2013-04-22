@@ -83,7 +83,7 @@ ifneq (,$(findstring  $() ,$(PWD)))
 $(error "The path to this compat-drivers directory has spaces in it." \
 	"Please put it somewhere where there is no space")
 endif
-$(shell cat $(PWD)/net/compat-drivers/.compat_base)
+#$(shell cat $(PWD)/net/compat-drivers/.compat_base)
 export CFLAGS += \
         -DCOMPAT_BASE="\"$(shell cat $(PWD)/net/compat-drivers/.compat_base)\"" \
         -DCOMPAT_BASE_TREE="\"$(shell cat $(PWD)/net/compat-drivers/.compat_base_tree)\"" \
