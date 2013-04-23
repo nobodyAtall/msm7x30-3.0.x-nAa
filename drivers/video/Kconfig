@@ -2339,9 +2339,31 @@ config FB_MSM_MDDI_HITACHI_HVGA_LCD
 	---help---
 	  Support for Hitachi HVGA MDDI LCD Panel (320x480)
 
+config FB_MSM_MDDI_NOVATEK_FWVGA
+        bool "MDDI Novatek FWVGA panel"
+        select FB_MSM_MDDI
+        ---help---
+          Support for MDDI Novatek (854x480) FWVGA panel
+
 config FB_MDDI_DISABLE_REVERSE
 	bool "DISABLE REVERSE"
 	default n
+
+config MDDI_NOVATEK_PANEL_SONY_ACX424AKM
+        depends on FB_MSM_MDDI_NOVATEK_FWVGA
+        bool "SONY ACX424AKM Panel"
+        default n
+        ---help---
+          Support for SONY_ACX424AKM panel connected
+          to the MDDI Novatek micro controller
+
+config MDDI_NOVATEK_PANEL_HITACHI_DX09D09VM
+        depends on FB_MSM_MDDI_NOVATEK_FWVGA
+        bool "HITACHI DX09D09VM Panel"
+        default n
+        ---help---
+          Support for HITACHI_DX09D09VM panel connected
+          to the MDDI Novatek micro controller
 
 config FB_MX3
 	tristate "MX3 Framebuffer support"
