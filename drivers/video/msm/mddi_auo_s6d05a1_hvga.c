@@ -16,7 +16,7 @@
 #include <linux/fb.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
-#include <linux/autoconf.h>
+#include <generated/autoconf.h>
 #include <linux/mddi_auo_s6d05a1_hvga.h>
 #include <asm/byteorder.h>
 
