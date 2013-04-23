@@ -488,3 +488,24 @@ uint32 mdp_get_lcd_line_counter(struct msm_fb_data_type *mfd)
 
 	return lcd_line;
 }
+
+void mdp_vsync_config_update(struct msm_panel_info *pinfo)
+{
+	uint32 mdp_vsync_clk_speed_hz;
+	uint32 vsync_cnt_cfg, vsync_cnt_cfg_dem;
+	uint32 total_line = pinfo->yres + pinfo->lcd.v_back_porch
+					+ pinfo->lcd.v_front_porch;
+	unsigned long cfg;
+
+	mdp_vsync_clk_speed_hz = clk_get_rate(mdp_vsync_clk);
+	vsync_cnt_cfg_dem = (pinfo->lcd.refx100 * total_line) / 100;
+	vsync_cnt_cfg = (mdp_vsync_clk_speed_hz) / vsync_cnt_cfg_dem;
+
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
+	cfg = readl(MDP_BASE + MDP_SYNC_CFG_0);
+	cfg &= (0xfff80000);
+	cfg |= vsync_cnt_cfg;
+	MDP_OUTP(MDP_BASE + MDP_SYNC_CFG_0, cfg);
+	MDP_OUTP(MDP_BASE + MDP_SYNC_CFG_1, cfg);
+	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+}
