@@ -3536,14 +3536,12 @@ int cyttsp_xres(void)
 {
 	int polarity;
 	int rc;
-printk(KERN_ERR "cyttsp_xres 1\n");
 	rc = gpio_direction_input(CYPRESS_TOUCH_GPIO_RESET);
 	if (rc) {
 		printk(KERN_ERR "%s: failed to set direction input, %d\n",
 		       __func__, rc);
 		return -EIO;
 	}
-printk(KERN_ERR "cyttsp_xres 2\n");
 	polarity = gpio_get_value(CYPRESS_TOUCH_GPIO_RESET) & 0x01;
 	printk(KERN_INFO "%s: %d\n", __func__, polarity);
 	rc = gpio_direction_output(CYPRESS_TOUCH_GPIO_RESET, polarity ^ 1);
@@ -3554,7 +3552,6 @@ printk(KERN_ERR "cyttsp_xres 2\n");
 	}
 	msleep(1);
 	gpio_set_value(CYPRESS_TOUCH_GPIO_RESET, polarity);
-printk(KERN_ERR "cyttsp_xres 3\n");
 	return 0;
 }
 
@@ -6725,7 +6722,6 @@ out3:
  */
 static void __init mogami_temp_fixups(void)
 {
-printk(KERN_NOTICE "mogami_temp_fixups 1\n");
 	vreg_helper_off("gp3");	/* L0 */
 	vreg_helper_off("gp5");	/* L23 */
 	gpio_set_value(46, 1);	/* SPI_CS0_N */
@@ -7127,23 +7123,19 @@ static void __init msm7x30_init(void)
 	soc_version = socinfo_get_version();
 	wlan_init_seq();
 	msm_clock_init(&msm7x30_clock_init_data);
-printk(KERN_NOTICE "msm7x30_init 1\n");
 #ifdef CONFIG_SERIAL_MSM_CONSOLE
 	msm7x30_init_uart3();
 #endif
-printk(KERN_NOTICE "msm7x30_init 2\n");
 	msm_spm_init(&msm_spm_data, 1);
 	acpuclk_init(&acpuclk_7x30_soc_data);
 	if (machine_is_msm7x30_surf() || machine_is_msm7x30_fluid())
 		msm7x30_cfg_smsc911x();
-printk(KERN_NOTICE "msm7x30_init 3\n");
 #ifdef CONFIG_USB_MSM_OTG_72K
 	if (SOCINFO_VERSION_MAJOR(soc_version) >= 2 &&
 			SOCINFO_VERSION_MINOR(soc_version) >= 1) {
 		pr_debug("%s: SOC Version:2.(1 or more)\n", __func__);
 		msm_otg_pdata.ldo_set_voltage = 0;
 	}
-printk(KERN_NOTICE "msm7x30_init 4\n");
 	hsusb_chg_set_supplicants(hsusb_chg_supplied_to,
 				  ARRAY_SIZE(hsusb_chg_supplied_to));
 	msm_device_otg.dev.platform_data = &msm_otg_pdata;
@@ -7166,16 +7158,12 @@ printk(KERN_NOTICE "msm7x30_init 4\n");
 		msm_adc_pdata.dev_names = msm_adc_surf_device_names;
 		msm_adc_pdata.num_adc = ARRAY_SIZE(msm_adc_surf_device_names);
 	}
-printk(KERN_NOTICE "msm7x30_init 5\n");
 	pmic8058_leds_init();
-printk(KERN_NOTICE "msm7x30_init 6\n");
 	buses_init();
-printk(KERN_NOTICE "msm7x30_init 7\n");
 #ifdef CONFIG_MSM_SSBI
 	msm_device_ssbi_pmic1.dev.platform_data =
 				&msm7x30_ssbi_pm8058_pdata;
 #endif
-printk(KERN_NOTICE "msm7x30_init 8\n");
 	platform_add_devices(msm_footswitch_devices,
 			     msm_num_footswitch_devices);
 	platform_add_devices(devices, ARRAY_SIZE(devices));
@@ -7183,12 +7171,9 @@ printk(KERN_NOTICE "msm7x30_init 8\n");
 #ifdef CONFIG_USB_EHCI_MSM_72K
 	msm_add_host(0, &msm_usb_host_pdata);
 #endif
-printk(KERN_NOTICE "msm7x30_init 9\n");
 	msm7x30_init_mmc();
 	msm_qsd_spi_init();
-printk(KERN_NOTICE "msm7x30_init 10\n");
 	msm7x30_init_nand();
-printk(KERN_NOTICE "msm7x30_init 11\n");
 #ifdef CONFIG_BT
 	bluetooth_power(0);
 #endif
@@ -7204,7 +7189,6 @@ printk(KERN_NOTICE "msm7x30_init 11\n");
 	msm_device_i2c_2_init();
 	qup_device_i2c_init();
 	msm7x30_init_marimba();
-printk(KERN_NOTICE "msm7x30_init 13\n");
 #ifdef CONFIG_MSM7KV2_AUDIO
 	snddev_poweramp_gpio_init();
 	snddev_hsed_voltage_init();
@@ -7406,13 +7390,10 @@ static void __init msm7x30_allocate_memory_regions(void)
 static void __init msm7x30_map_io(void)
 {
 	msm_shared_ram_phys = 0x00100000;
-printk(KERN_NOTICE "msm7x30_map_io 1 \n");
 	msm_map_msm7x30_io();
-printk(KERN_NOTICE "msm7x30_map_io 1 \n");
 	if (socinfo_init() < 0)
 		printk(KERN_ERR "%s: socinfo_init() failed!\n",
 		       __func__);
-printk(KERN_NOTICE "msm7x30_map_io 3 \n");
 }
 
 static void __init msm7x30_init_early(void)
