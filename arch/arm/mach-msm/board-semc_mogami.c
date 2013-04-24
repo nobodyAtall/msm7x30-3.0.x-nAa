@@ -74,6 +74,9 @@
 #ifdef CONFIG_TOUCHSCREEN_CYTTSP_CORE
 #include <linux/cyttsp.h>
 #endif
+#ifdef CONFIG_TOUCHSCREEN_CY8CTMA300_SPI
+#include <linux/spi/cy8ctma300_touch.h>
+#endif
 #ifdef CONFIG_INPUT_BMA150
 #include <linux/bma150.h>
 #endif
