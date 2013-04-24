@@ -1,5 +1,6 @@
 
 source "drivers/video/msm/vidc/Kconfig"
+source "drivers/video/msm/mddi_nt_panels/Kconfig"
 
 config FB_MSM
 	tristate "MSM Framebuffer support"
@@ -571,6 +572,20 @@ config FB_MSM_SECONDARY_PANEL_NONE
 	---help---
 	  No secondary panel
 endchoice
+
+config FB_MSM_MDDI_NOVATEK_FWVGA
+	bool "MDDI Novatek FWVGA panel"
+	select FB_MSM_MDDI
+	---help---
+	  Support for MDDI Novatek (854x480) FWVGA panel
+
+config FB_MSM_MDDI_NOVATEK_DISABLE_MDDI
+	bool "Disable MDDI"
+	default n
+
+config FB_MDDI_DISABLE_REVERSE
+	bool "DISABLE REVERSE"
+	default n
 
 config FB_MSM_LCDC_DSUB
 	depends on FB_MSM_LCDC_SAMSUNG_WSVGA && FB_MSM_MDP40 && FB_MSM_LCDC_HW
