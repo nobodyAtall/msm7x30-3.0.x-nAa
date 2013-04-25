@@ -1546,6 +1546,7 @@ static int cyttsp_power_on(struct cyttsp *ts)
 {
 	int retval;
 	int counter = 5;
+	u8 gesture_setup;
 
 again:
 	dev_vdbg(ts->pdev, "%s: trying ...\n", __func__);
@@ -1589,8 +1590,6 @@ again:
 	#ifndef CONFIG_MACH_SEMC_IYOKAN
 	if (ts->platform_data->use_gestures) {
 	#endif
-		u8 gesture_setup;
-
 		DBG(printk(KERN_INFO"%s: Init gesture setup\n", __func__);)
 		retval = ttsp_read_block_data(ts, CY_REG_GEST_SET,
 				sizeof(gesture_setup), &gesture_setup);
