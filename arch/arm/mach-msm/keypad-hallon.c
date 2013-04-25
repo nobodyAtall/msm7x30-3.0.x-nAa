@@ -1,4 +1,4 @@
-/* /kernel/arch/arm/mach-msm/keypad-smultron.c
+/* /kernel/arch/arm/mach-msm/keypad-hallon.c
  *
  * Copyright (C) [2010] Sony Ericsson Mobile Communications AB.
  *
@@ -12,11 +12,13 @@
 #include "board-semc_mogami-keypad.h"
 
 static const unsigned int keymap[] = {
+	KEY(0, 0, KEY_BACK),
 	KEY(0, 1, KEY_HOME),
+	KEY(0, 2, KEY_MENU),
 	KEY(0, 3, KEY_VOLUMEUP),
 	KEY(0, 4, KEY_VOLUMEDOWN),
-	KEY(0, 5, KEY_CAMERA_FOCUS),
-	KEY(0, 6, KEY_CAMERA),
+	KEY(0, 5, KEY_CAMERA),
+	KEY(0, 6, KEY_CAMERA_FOCUS),
 };
 
 static struct matrix_keymap_data keymap_data = {

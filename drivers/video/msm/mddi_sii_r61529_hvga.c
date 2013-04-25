@@ -16,7 +16,7 @@
 #include <linux/fb.h>
 #include <linux/delay.h>
 #include <linux/mutex.h>
-#include <linux/autoconf.h>
+#include <generated/autoconf.h>
 #include <linux/mddi_sii_r61529_hvga.h>
 
 /* Internal version number */
