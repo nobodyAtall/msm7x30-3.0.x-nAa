@@ -54,7 +54,7 @@ static unsigned int awake_ideal_freq;
  * that practically when sleep_ideal_freq==0 the awake_ideal_freq is used
  * also when suspended).
  */
-#define DEFAULT_SLEEP_IDEAL_FREQ 134400
+#define DEFAULT_SLEEP_IDEAL_FREQ 122880
 static unsigned int sleep_ideal_freq;
 
 /*
