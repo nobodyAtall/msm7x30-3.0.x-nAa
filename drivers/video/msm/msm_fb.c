@@ -353,7 +353,7 @@ static int msm_fb_probe(struct platform_device *pdev)
 		msm_fb_resource_initialized = 1;
 		return 0;
 	}
-MSM_FB_DEBUG("msm_fb_probe 2\n");
+
 	if (!msm_fb_resource_initialized)
 		return -EPERM;
 
@@ -373,7 +373,7 @@ MSM_FB_DEBUG("msm_fb_probe 2\n");
 #ifdef CONFIG_FB_MSM_OVERLAY
 	mfd->overlay_play_enable = 1;
 #endif
-MSM_FB_DEBUG("msm_fb_probe 3\n");
+
 	bf_supported = mdp4_overlay_borderfill_supported();
 
 	rc = msm_fb_register(mfd);
@@ -394,13 +394,11 @@ MSM_FB_DEBUG("msm_fb_probe 3\n");
 		else
 			lcd_backlight_registered = 1;
 	}
-MSM_FB_DEBUG("msm_fb_probe 4\n");
 #endif
 #endif
 
 	pdev_list[pdev_list_cnt++] = pdev;
 	msm_fb_create_sysfs(pdev);
-MSM_FB_DEBUG("msm_fb_probe 5\n");
 	return 0;
 }
 
@@ -582,7 +580,7 @@ static int msm_fb_resume_sub(struct msm_fb_data_type *mfd)
 		     msm_fb_blank_sub(FB_BLANK_UNBLANK, mfd->fbi,
 				      mfd->op_enable);
 		if (ret)
-			MSM_FB_INFO("msm_fb_resume: can't turn on display1!\n");
+			MSM_FB_INFO("msm_fb_resume: can't turn on display!\n");
 	}
 
 	return ret;
@@ -1058,7 +1056,7 @@ static int msm_fb_register(struct msm_fb_data_type *mfd)
 	static int subsys_id[2] = {MSM_SUBSYSTEM_DISPLAY,
 		MSM_SUBSYSTEM_ROTATOR};
 	unsigned int flags = MSM_SUBSYSTEM_MAP_IOVA;
-MSM_FB_DEBUG("msm_fb_register 1\n");
+
 	/*
 	 * fb info initialization
 	 */
@@ -1200,12 +1198,12 @@ MSM_FB_DEBUG("msm_fb_register 1\n");
 			   mfd->index);
 		return ret;
 	}
-MSM_FB_DEBUG("msm_fb_register 2\n");
+
 	fix->type = panel_info->is_3d_panel;
 
 	fix->line_length = msm_fb_line_length(mfd->index, panel_info->xres,
 					      bpp);
-MSM_FB_DEBUG("msm_fb_register 3\n");
+
 	/* Make sure all buffers can be addressed on a page boundary by an x
 	 * and y offset */
 
@@ -1238,7 +1236,7 @@ MSM_FB_DEBUG("msm_fb_register 3\n");
 			__func__, __LINE__, mfd->index);
 		fix->smem_len = 0;
 	}
-MSM_FB_DEBUG("msm_fb_register 4\n");
+
 	mfd->var_xres = panel_info->xres;
 	mfd->var_yres = panel_info->yres;
 	mfd->var_frame_rate = panel_info->frame_rate;
@@ -1273,7 +1271,7 @@ MSM_FB_DEBUG("msm_fb_register 4\n");
 		}
 	}
 	pr_debug("reserved[3] %u\n", var->reserved[3]);
-MSM_FB_DEBUG("msm_fb_register 5\n");
+
 		/*
 		 * id field for fb app
 		 */
@@ -1293,7 +1291,7 @@ MSM_FB_DEBUG("msm_fb_register 5\n");
 	 fbi->fbops = &msm_fb_ops;
 	fbi->flags = FBINFO_FLAG_DEFAULT;
 	fbi->pseudo_palette = msm_fb_pseudo_palette;
-MSM_FB_DEBUG("msm_fb_register 6\n");
+
 	mfd->ref_cnt = 0;
 	mfd->sw_currently_refreshing = FALSE;
 	mfd->sw_refreshing_enable = TRUE;
@@ -1339,7 +1337,7 @@ MSM_FB_DEBUG("msm_fb_register 6\n");
 
 	mfd->op_enable = TRUE;
 	mfd->panel_power_on = FALSE;
-MSM_FB_DEBUG("msm_fb_register 7\n");
+
 	/* cursor memory allocation */
 	if (mfd->cursor_update) {
 		mfd->cursor_buf = dma_alloc_coherent(NULL,
@@ -1356,7 +1354,7 @@ MSM_FB_DEBUG("msm_fb_register 7\n");
 			printk(KERN_ERR "%s: fb_alloc_cmap() failed!\n",
 					__func__);
 	}
-MSM_FB_DEBUG("msm_fb_register 8\n");
+
 	if (register_framebuffer(fbi) < 0) {
 		if (mfd->lut_update)
 			fb_dealloc_cmap(&fbi->cmap);
@@ -1381,7 +1379,7 @@ MSM_FB_DEBUG("msm_fb_register 8\n");
 	MSM_FB_INFO
 	    ("FrameBuffer[%d] %dx%d size=%d bytes is registered successfully!\n",
 	     mfd->index, fbi->var.xres, fbi->var.yres, fbi->fix.smem_len);
-MSM_FB_DEBUG("msm_fb_register 9\n");
+
 #ifdef CONFIG_FB_MSM_LOGO
 	if (mfd->index == 0) {
 		if (!load_565rle_image(INIT_IMAGE_FILE, bf_supported)) {
@@ -1400,13 +1398,13 @@ MSM_FB_DEBUG("msm_fb_register 9\n");
 		register_early_suspend(&mfd->early_suspend);
 	}
 #endif
-MSM_FB_DEBUG("msm_fb_register 10\n");
+
 #ifdef MSM_FB_ENABLE_DBGFS
 	{
 		struct dentry *root;
 		struct dentry *sub_dir;
 		char sub_name[2];
-		printk(KERN_ERR "\n\n\n\nFB_MSM: GOT HERE!!!\n\n\n\n");
+
 		root = msm_fb_get_debugfs_root();
 		if (root != NULL) {
 			sub_name[0] = (char)(mfd->index + 0x30);
@@ -1556,7 +1554,7 @@ static int msm_fb_open(struct fb_info *info, int user)
 				__func__, __LINE__, info->node);
 
 		if (msm_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable)) {
-			printk(KERN_ERR "msm_fb_open: can't turn on display2!\n");
+			printk(KERN_ERR "msm_fb_open: can't turn on display!\n");
 			return -1;
 		}
 	}
@@ -1678,7 +1676,7 @@ static int msm_fb_pan_display(struct fb_var_screeninfo *var,
 	if (info->node == 0 && !(mfd->cont_splash_done)) { /* primary */
 		mdp_set_dma_pan_info(info, NULL, TRUE);
 		if (msm_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable)) {
-			pr_err("%s: can't turn on display3!\n", __func__);
+			pr_err("%s: can't turn on display!\n", __func__);
 			return -EINVAL;
 		}
 	}
@@ -2833,7 +2831,7 @@ static int msmfb_overlay_play(struct fb_info *info, unsigned long *argp)
 	if (info->node == 0 && !(mfd->cont_splash_done)) { /* primary */
 		mdp_set_dma_pan_info(info, NULL, TRUE);
 		if (msm_fb_blank_sub(FB_BLANK_UNBLANK, info, mfd->op_enable)) {
-			pr_err("%s: can't turn on display4!\n", __func__);
+			pr_err("%s: can't turn on display!\n", __func__);
 			return -EINVAL;
 		}
 	}
