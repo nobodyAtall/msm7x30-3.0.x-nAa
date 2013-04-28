@@ -31,6 +31,10 @@ config FB_MSM_LCDC_HW
 	bool
 	default n
 
+config FB_MSM_HDPI
+	bool "Increased pmem size needed for HDPI devices"
+	default n
+
 config FB_MSM_TRIPLE_BUFFER
 	bool "Support for triple frame buffer"
 	default n
