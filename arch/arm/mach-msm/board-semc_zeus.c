@@ -70,6 +70,7 @@
 #include <linux/spi/cypress_touch.h>
 #include <linux/hrtimer.h>
 #include <linux/bma150_ng.h>
+#include <linux/gp2ap002a00f.h>
 #include <mach/mddi_novatek_fwvga.h>
 
 #define CYPRESS_TOUCH_GPIO_RESET        (40)
@@ -77,6 +78,7 @@
 #define NOVATEK_GPIO_RESET              (157)
 
 #define AKM8975_GPIO			(92)
+#define GP2A_GPIO			(20)
 #define BMA150_GPIO			(51)
 
 #include <asm/mach/mmc.h>
@@ -767,6 +769,34 @@ struct bma150_platform_data bma150_ng_platform_data = {
 	.gpio_setup = bma150_gpio_setup,
 };
 
+static struct msm_gpio gp2a_gpio_config_data[] = {
+	{ GPIO_CFG(GP2A_GPIO, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GP2A_GPIO_NAME },
+};
+
+static int gp2a_gpio_setup(void)
+{
+	int rc;
+	rc = msm_gpios_request_enable(gp2a_gpio_config_data,
+		ARRAY_SIZE(gp2a_gpio_config_data));
+
+	return rc;
+}
+
+static int gp2a_gpio_teardown(void)
+{
+	msm_gpios_disable_free(gp2a_gpio_config_data,
+		ARRAY_SIZE(gp2a_gpio_config_data));
+
+	return 0;
+}
+
+static struct gp2a_platform_data gp2a_platform_data = {
+	.gpio = GP2A_GPIO,
+	.wake = 1,
+	.gpio_setup = gp2a_gpio_setup,
+	.gpio_shutdown = gp2a_gpio_teardown,
+};
+
 static struct as3676_als_config as3676_als_config = {
 	.gain = AS3676_GAIN_1,
 	.filter_up = AS3676_FILTER_1HZ,
@@ -826,6 +856,11 @@ static struct i2c_board_info msm_camera_boardinfo[] __initdata = {
 		I2C_BOARD_INFO(MDDI_NOVATEK_I2C_NAME, 0x98 >> 1),
 		.type = MDDI_NOVATEK_I2C_NAME,
 		.platform_data = &novatek_i2c_pdata,
+	},
+	{
+		I2C_BOARD_INFO(GP2A_I2C_NAME, 0x88 >> 1),
+		.irq		= MSM_GPIO_TO_INT(GP2A_GPIO),
+		.platform_data	= &gp2a_platform_data
 	},
 #ifdef CONFIG_MT9D112
 	{

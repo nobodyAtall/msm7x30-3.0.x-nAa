@@ -17,6 +17,7 @@
 #include <linux/interrupt.h>
 #include <linux/gpio.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 #include <linux/gp2ap002a00f.h>
 
 struct gp2a_data {
