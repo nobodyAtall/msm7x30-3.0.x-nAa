@@ -172,6 +172,8 @@ static unsigned int phys_add = DDR2_BANK_BASE;
 unsigned long ebi1_phys_offset = DDR2_BANK_BASE;
 EXPORT_SYMBOL(ebi1_phys_offset);
 
+extern void msm_init_pmic_vibrator(void);
+
 static int vreg_helper_on(const char *pzName, unsigned mv)
 {
 	struct vreg *reg = NULL;
@@ -6256,6 +6258,7 @@ printk(KERN_NOTICE "msm7x30_init 13\n");
 	snddev_hsed_voltage_init();
 	aux_pcm_gpio_init();
 #endif
+	msm_init_pmic_vibrator();
 
 	i2c_register_board_info(0, msm_i2c_board_info,
 			ARRAY_SIZE(msm_i2c_board_info));
