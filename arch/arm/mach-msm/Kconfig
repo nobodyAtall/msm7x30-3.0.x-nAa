@@ -560,6 +560,16 @@ config MACH_SEMC_SATSUMA
 	help
 	  Support for the SonyEricsson Satsuma devices.
 
+config MACH_SEMC_ZEUS
+	depends on ARCH_MSM7X30
+	depends on !MSM_STACKED_MEMORY
+	select SUPPORT_ALIEN_USB_CHARGER
+	select USE_PMIC_CHARGING_ON_AMSS
+	default y
+	bool "SonyEricsson Zeus"
+	help
+	  Support for the SonyEricsson Zeus devices.
+
 config MACH_SAPPHIRE
 	depends on ARCH_MSM7X01A
 	default n
