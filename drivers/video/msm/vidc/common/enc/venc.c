@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1606,6 +1606,29 @@ static long vid_enc_ioctl(struct file *file,
 		}
 		if (!result) {
 			ERR("setting VEN_IOCTL_(G)SET_LIVE_MODE failed\n");
+			return -EIO;
+		}
+		break;
+	}
+	case VEN_IOCTL_SET_H263_PLUSPTYPE:
+	{
+		struct vcd_property_hdr vcd_property_hdr;
+		struct venc_plusptype plusptype;
+		u32 enable;
+		u32 vcd_status = VCD_ERR_FAIL;
+		if (copy_from_user(&venc_msg, arg, sizeof(venc_msg)))
+			return -EFAULT;
+		if (copy_from_user(&plusptype, venc_msg.in,
+			sizeof(plusptype)))
+			return -EFAULT;
+		vcd_property_hdr.prop_id = VCD_I_H263_PLUSPTYPE;
+		vcd_property_hdr.sz = sizeof(u32);
+		enable = plusptype.plusptype_enable;
+		DBG("VEN_IOCTL_SET PLUSPTYPE = %d\n", enable);
+		vcd_status = vcd_set_property(client_ctx->vcd_handle,
+						&vcd_property_hdr, &enable);
+		if (vcd_status) {
+			pr_err(" Setting plusptype failed");
 			return -EIO;
 		}
 		break;

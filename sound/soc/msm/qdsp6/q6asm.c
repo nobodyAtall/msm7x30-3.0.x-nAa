@@ -1,6 +1,6 @@
 
 /*
- * Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+ * Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  * Author: Brian Swetland <swetland@google.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -810,6 +810,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 	uint32_t token;
 	unsigned long dsp_flags;
 	uint32_t *payload;
+	uint32_t wakeup_flag = 1;
 
 
 	if ((ac == NULL) || (data == NULL)) {
@@ -821,7 +822,13 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 			ac->session);
 		return -EINVAL;
 	}
-
+	if (atomic_read(&ac->nowait_cmd_cnt) > 0) {
+		pr_debug("%s: nowait_cmd_cnt %d\n",
+				__func__,
+				atomic_read(&ac->nowait_cmd_cnt));
+		atomic_dec(&ac->nowait_cmd_cnt);
+		wakeup_flag = 0;
+	}
 	payload = data->payload;
 
 	if (data->opcode == RESET_EVENTS) {
@@ -865,7 +872,7 @@ static int32_t q6asm_callback(struct apr_client_data *data, void *priv)
 		case ASM_STREAM_CMD_OPEN_READWRITE:
 		case ASM_DATA_CMD_MEDIA_FORMAT_UPDATE:
 		case ASM_STREAM_CMD_SET_ENCDEC_PARAM:
-			if (atomic_read(&ac->cmd_state)) {
+			if (atomic_read(&ac->cmd_state) && wakeup_flag) {
 				atomic_set(&ac->cmd_state, 0);
 				wake_up(&ac->cmd_wait);
 			}
@@ -1503,12 +1510,12 @@ int q6asm_run_nowait(struct audio_client *ac, uint32_t flags,
 	run.flags    = flags;
 	run.msw_ts   = msw_ts;
 	run.lsw_ts   = lsw_ts;
-
 	rc = apr_send_pkt(ac->apr, (uint32_t *) &run);
 	if (rc < 0) {
 		pr_err("%s:Commmand run failed[%d]", __func__, rc);
 		return -EINVAL;
 	}
+	atomic_inc(&ac->nowait_cmd_cnt);
 	return 0;
 }
 
@@ -1668,6 +1675,67 @@ int q6asm_cfg_dual_mono_aac(struct audio_client *ac,
 	return 0;
 fail_cmd:
 	return -EINVAL;
+}
+
+int q6asm_set_encdec_chan_map(struct audio_client *ac,
+			uint32_t num_channels)
+{
+	struct asm_stream_cmd_encdec_channelmap chan_map;
+	u8 *channel_mapping;
+
+	int rc = 0;
+
+	pr_debug("%s: Session %d, num_channels = %d\n",
+			 __func__, ac->session, num_channels);
+
+	q6asm_add_hdr(ac, &chan_map.hdr, sizeof(chan_map), TRUE);
+
+	chan_map.hdr.opcode = ASM_STREAM_CMD_SET_ENCDEC_PARAM;
+	chan_map.param_id = ASM_ENCDEC_DEC_CHAN_MAP;
+	chan_map.param_size = sizeof(struct asm_dec_chan_map);
+	chan_map.chan_map.num_channels = num_channels;
+
+	channel_mapping =
+		chan_map.chan_map.channel_mapping;
+
+	memset(channel_mapping, PCM_CHANNEL_NULL, MAX_CHAN_MAP_CHANNELS);
+	if (num_channels == 1)  {
+		channel_mapping[0] = PCM_CHANNEL_FL;
+	} else if (num_channels == 2) {
+		channel_mapping[0] = PCM_CHANNEL_FL;
+		channel_mapping[1] = PCM_CHANNEL_FR;
+	} else if (num_channels == 6) {
+		channel_mapping[0] = PCM_CHANNEL_FC;
+		channel_mapping[1] = PCM_CHANNEL_FL;
+		channel_mapping[2] = PCM_CHANNEL_FR;
+		channel_mapping[3] = PCM_CHANNEL_LB;
+		channel_mapping[4] = PCM_CHANNEL_RB;
+		channel_mapping[5] = PCM_CHANNEL_LFE;
+	} else {
+		pr_err("%s: ERROR.unsupported num_ch = %u\n", __func__,
+				num_channels);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+
+	rc = apr_send_pkt(ac->apr, (uint32_t *) &chan_map);
+	if (rc < 0) {
+		pr_err("%s:Command opcode[0x%x]paramid[0x%x] failed\n",
+				__func__, ASM_STREAM_CMD_SET_ENCDEC_PARAM,
+				ASM_ENCDEC_DEC_CHAN_MAP);
+		goto fail_cmd;
+	}
+	rc = wait_event_timeout(ac->cmd_wait,
+			(atomic_read(&ac->cmd_state) == 0), 5*HZ);
+	if (!rc) {
+		pr_err("%s:timeout opcode[0x%x]\n", __func__,
+						chan_map.hdr.opcode);
+		rc = -ETIMEDOUT;
+		goto fail_cmd;
+	}
+	return 0;
+fail_cmd:
+	return rc;
 }
 
 int q6asm_enc_cfg_blk_qcelp(struct audio_client *ac, uint32_t frames_per_buf,
@@ -3242,11 +3310,13 @@ int q6asm_cmd_nowait(struct audio_client *ac, int cmd)
 	pr_debug("%s:session[%d]opcode[0x%x] ", __func__,
 						ac->session,
 						hdr.opcode);
+
 	rc = apr_send_pkt(ac->apr, (uint32_t *) &hdr);
 	if (rc < 0) {
 		pr_err("%s:Commmand 0x%x failed\n", __func__, hdr.opcode);
 		goto fail_cmd;
 	}
+	atomic_inc(&ac->nowait_cmd_cnt);
 	return 0;
 fail_cmd:
 	return -EINVAL;

@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -116,8 +116,8 @@ enum battery_type {
  * @r_sense:		sense resistor value in (mOhms)
  * @i_test:		current at which the unusable charger cutoff is to be
  *			calculated or the peak system current (mA)
- * @v_failure:		the voltage at which the battery is considered empty(mV)
- * @calib_delay_ms:	how often should the adc calculate gain and offset
+ * @v_cutoff:		the loaded voltage at which the battery
+ *			is considered empty(mV)
  * @enable_fcc_learning:	if set the driver will learn full charge
  *				capacity of the battery upon end of charge
  */
@@ -126,11 +126,14 @@ struct pm8921_bms_platform_data {
 	enum battery_type		battery_type;
 	unsigned int			r_sense;
 	unsigned int			i_test;
-	unsigned int			v_failure;
-	unsigned int			calib_delay_ms;
+	unsigned int			v_cutoff;
 	unsigned int			max_voltage_uv;
 	unsigned int			rconn_mohm;
 	int				enable_fcc_learning;
+	int				shutdown_soc_valid_limit;
+	int				ignore_shutdown_soc;
+	int				adjust_soc_low_threshold;
+	int				chg_term_ua;
 };
 
 #if defined(CONFIG_PM8921_BMS) || defined(CONFIG_PM8921_BMS_MODULE)
@@ -202,6 +205,13 @@ int pm8921_bms_get_simultaneous_battery_voltage_and_current(int *ibat_ua,
  * pm8921_bms_get_rbatt - function to get the battery resistance in mOhm.
  */
 int pm8921_bms_get_rbatt(void);
+/**
+ * pm8921_bms_invalidate_shutdown_soc - function to notify the bms driver that
+ *					the battery was replaced between reboot
+ *					and so it should not use the shutdown
+ *					soc stored in a coincell backed register
+ */
+void pm8921_bms_invalidate_shutdown_soc(void);
 #else
 static inline int pm8921_bms_get_vsense_avg(int *result)
 {
@@ -236,6 +246,9 @@ static inline int pm8921_bms_get_simultaneous_battery_voltage_and_current(
 static inline int pm8921_bms_get_rbatt(void)
 {
 	return -EINVAL;
+}
+static inline void pm8921_bms_invalidate_shutdown_soc(void)
+{
 }
 #endif
 

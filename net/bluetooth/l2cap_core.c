@@ -1,6 +1,6 @@
 /*
    BlueZ - Bluetooth protocol stack for Linux
-   Copyright (c) 2000-2001, 2010-2012 Code Aurora Forum.  All rights reserved.
+   Copyright (c) 2000-2001, 2010-2012 The Linux Foundation.  All rights reserved.
    Copyright (C) 2009-2010 Gustavo F. Padovan <gustavo@padovan.org>
    Copyright (C) 2010 Google Inc.
 
@@ -698,6 +698,9 @@ void l2cap_send_cmd(struct l2cap_conn *conn, u8 ident, u8 code, u16 len, void *d
 	BT_DBG("code 0x%2.2x", code);
 
 	if (!skb)
+		return;
+
+	if (conn->hcon == NULL || conn->hcon->hdev == NULL)
 		return;
 
 	if (lmp_no_flush_capable(conn->hcon->hdev))

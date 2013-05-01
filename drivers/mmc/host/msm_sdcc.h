@@ -2,7 +2,7 @@
  *  linux/drivers/mmc/host/msmsdcc.h - QCT MSM7K SDC Controller
  *
  *  Copyright (C) 2008 Google, All Rights Reserved.
- *  Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+ *  Copyright (c) 2009-2011, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -210,7 +210,7 @@
 
 #define NR_SG		128
 
-#define MSM_MMC_IDLE_TIMEOUT	5000 /* msecs */
+#define MSM_MMC_DEFAULT_IDLE_TIMEOUT	5000 /* msecs */
 
 /*
  * Set the request timeout to 10secs to allow
@@ -410,9 +410,11 @@ struct msmsdcc_host {
 	bool sdcc_suspended;
 	bool sdio_wakeupirq_disabled;
 	bool pending_resume;
+	unsigned int idle_tout_ms;			/* Timeout in msecs */
 	struct msmsdcc_msm_bus_vote msm_bus_vote;
 	struct device_attribute	max_bus_bw;
 	struct device_attribute	polling;
+	struct device_attribute idle_timeout;
 };
 
 int msmsdcc_set_pwrsave(struct mmc_host *mmc, int pwrsave);

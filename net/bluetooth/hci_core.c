@@ -1,6 +1,6 @@
 /*
    BlueZ - Bluetooth protocol stack for Linux
-   Copyright (c) 2000-2001, 2010-2012 Code Aurora Forum.  All rights reserved.
+   Copyright (c) 2000-2001, 2010-2012 The Linux Foundation.  All rights reserved.
 
    Written 2000,2001 by Maxim Krasnyansky <maxk@qualcomm.com>
 
@@ -305,6 +305,12 @@ static void hci_le_init_req(struct hci_dev *hdev, unsigned long opt)
 
 	/* Read LE buffer size */
 	hci_send_cmd(hdev, HCI_OP_LE_READ_BUFFER_SIZE, 0, NULL);
+
+	/* Read LE clear white list */
+	hci_send_cmd(hdev, HCI_OP_LE_CLEAR_WHITE_LIST, 0, NULL);
+
+	/* Read LE white list size */
+	hci_send_cmd(hdev, HCI_OP_LE_READ_WHITE_LIST_SIZE, 0, NULL);
 }
 
 static void hci_scan_req(struct hci_dev *hdev, unsigned long opt)

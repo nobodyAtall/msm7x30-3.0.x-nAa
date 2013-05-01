@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -363,7 +363,7 @@ static int msm8960_paddr_to_memtype(unsigned int paddr)
 	return MEMTYPE_EBI1;
 }
 
-#define FMEM_ENABLED 1
+#define FMEM_ENABLED 0
 
 #ifdef CONFIG_ION_MSM
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
@@ -1437,7 +1437,7 @@ static struct msm_otg_platform_data msm_otg_pdata;
 static int wr_phy_init_seq[] = {
 	0x44, 0x80, /* set VBUS valid threshold
 			and disconnect valid threshold */
-	0x38, 0x81, /* update DC voltage level */
+	0x68, 0x81, /* update DC voltage level */
 	0x14, 0x82, /* set preemphasis and rise/fall time */
 	0x13, 0x83, /* set source impedance adjusment */
 	-1};
@@ -1445,7 +1445,7 @@ static int wr_phy_init_seq[] = {
 static int liquid_v1_phy_init_seq[] = {
 	0x44, 0x80,/* set VBUS valid threshold
 			and disconnect valid threshold */
-	0x3C, 0x81,/* update DC voltage level */
+	0x6C, 0x81,/* update DC voltage level */
 	0x18, 0x82,/* set preemphasis and rise/fall time */
 	0x23, 0x83,/* set source impedance sdjusment */
 	-1};

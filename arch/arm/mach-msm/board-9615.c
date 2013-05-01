@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -290,7 +290,7 @@ free_usb_5v_en:
 static int shelby_phy_init_seq[] = {
 	0x44, 0x80,/* set VBUS valid threshold and
 			disconnect valid threshold */
-	0x38, 0x81, /* update DC voltage level */
+	0x68, 0x81, /* update DC voltage level */
 	0x14, 0x82,/* set preemphasis and rise/fall time */
 	0x13, 0x83,/* set source impedance adjustment */
 	-1};
