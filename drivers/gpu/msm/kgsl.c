@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2008-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -752,6 +752,9 @@ kgsl_sharedmem_find_region(struct kgsl_process_private *private,
 	unsigned int gpuaddr, size_t size)
 {
 	struct rb_node *node = private->mem_rb.rb_node;
+
+	if (!kgsl_mmu_gpuaddr_in_range(gpuaddr))
+		return NULL;
 
 	while (node != NULL) {
 		struct kgsl_mem_entry *entry;

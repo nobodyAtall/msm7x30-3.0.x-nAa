@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -64,6 +64,18 @@ static int32_t adm_callback(struct apr_client_data *data, void *priv)
 				atomic_set(&this_adm.copp_stat[i], 0);
 			}
 			this_adm.apr = NULL;
+		}
+		pr_debug("Resetting calibration blocks");
+		for (i = 0; i < MAX_AUDPROC_TYPES; i++) {
+			/* Device calibration */
+			mem_addr_audproc[i].cal_size = 0;
+			mem_addr_audproc[i].cal_kvaddr = 0;
+			mem_addr_audproc[i].cal_paddr = 0;
+
+			/* Volume calibration */
+			mem_addr_audvol[i].cal_size = 0;
+			mem_addr_audvol[i].cal_kvaddr = 0;
+			mem_addr_audvol[i].cal_paddr = 0;
 		}
 		return 0;
 	}

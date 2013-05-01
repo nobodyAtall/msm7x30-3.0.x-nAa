@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -17,6 +17,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/init.h>
 #include <mach/irqs.h>
+#include <linux/notifier.h>
 #include <mach/msm_iomap.h>
 #include <mach/board.h>
 #include <mach/dma.h>
@@ -24,6 +25,7 @@
 #include <asm/mach/flash.h>
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/mach/mmc.h>
+#include <asm/cacheflush.h>
 #include <mach/rpc_hsusb.h>
 #include <mach/socinfo.h>
 
@@ -839,3 +841,23 @@ struct platform_device *msm_footswitch_devices[] = {
 	FS_PCOM(FS_GFX3D,  "fs_gfx3d"),
 };
 unsigned msm_num_footswitch_devices = ARRAY_SIZE(msm_footswitch_devices);
+
+static int msm7627a_panic_handler(struct notifier_block *this,
+		unsigned long event, void *ptr)
+{
+	flush_cache_all();
+	outer_flush_all();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block panic_handler = {
+	.notifier_call = msm7627a_panic_handler,
+};
+
+static int __init panic_register(void)
+{
+	atomic_notifier_chain_register(&panic_notifier_list,
+			&panic_handler);
+	return 0;
+}
+module_init(panic_register);

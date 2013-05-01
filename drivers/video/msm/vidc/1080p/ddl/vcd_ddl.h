@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -249,6 +249,7 @@ struct ddl_encoder_data{
 	struct ddl_enc_buffers  hw_bufs;
 	struct ddl_yuv_buffer_size  input_buf_size;
 	struct vidc_1080p_enc_frame_info enc_frame_info;
+	u32  plusptype_enable;
 	u32  meta_data_enable_flag;
 	u32  suffix;
 	u32  meta_data_offset;

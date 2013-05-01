@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -753,7 +753,6 @@ static u32 vcd_open_cmn
 	client = dev_ctxt->cctxt_list_head;
 	dev_ctxt->cctxt_list_head = cctxt;
 	cctxt->next = client;
-	dev_ctxt->turbo_mode_set = 0;
 
 	*clnt_cctxt = cctxt;
 

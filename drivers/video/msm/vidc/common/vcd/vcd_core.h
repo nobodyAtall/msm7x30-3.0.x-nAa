@@ -1,4 +1,4 @@
-/* Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2010-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -146,7 +146,7 @@ struct vcd_dev_ctxt {
 	u32 reqd_perf_lvl;
 	u32 curr_perf_lvl;
 	u32 set_perf_lvl_pending;
-	u32 turbo_mode_set;
+	bool turbo_mode_set;
 };
 
 struct vcd_clnt_status {
@@ -212,6 +212,7 @@ struct vcd_clnt_ctxt {
 	u32 meta_mode;
 	int secure;
 	int perf_set_by_client;
+	bool is_turbo_enabled;
 };
 
 #define VCD_BUFFERPOOL_INUSE_DECREMENT(val) \

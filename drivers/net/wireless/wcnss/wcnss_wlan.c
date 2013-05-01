@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -183,6 +183,12 @@ wcnss_wlan_ctrl_probe(struct platform_device *pdev)
 
 	return 0;
 }
+
+void wcnss_flush_delayed_boot_votes()
+{
+	flush_delayed_work_sync(&penv->wcnss_work);
+}
+EXPORT_SYMBOL(wcnss_flush_delayed_boot_votes);
 
 static int __devexit
 wcnss_wlan_ctrl_remove(struct platform_device *pdev)

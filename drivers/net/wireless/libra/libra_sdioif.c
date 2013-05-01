@@ -1,4 +1,4 @@
-/* Copyright (c) 2009-2012, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2009-2012, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -25,6 +25,12 @@ static int libra_mmc_host_index;
 
 /* SDIO Card ID / Device ID */
 static unsigned short  libra_sdio_card_id;
+
+/* completion variables */
+struct completion gCard_rem_event_var;
+EXPORT_SYMBOL(gCard_rem_event_var);
+struct completion gShutdown_event_var;
+EXPORT_SYMBOL(gShutdown_event_var);
 
 static suspend_handler_t *libra_suspend_hldr;
 static resume_handler_t *libra_resume_hldr;
