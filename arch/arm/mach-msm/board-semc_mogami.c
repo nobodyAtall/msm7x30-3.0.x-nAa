@@ -5327,18 +5327,48 @@ static struct wake_lock st_wk_lock;
 
 static int plat_chip_enable(struct kim_data_s *data)
 {
-	pr_info("plat_chip_enable\n");
+	pr_info("%s\n", __func__);
 	bluetooth_power(1);
 	wake_lock(&st_wk_lock);
+	pr_info("%s: done\n", __func__);
 	return 1;
 }
 
 static int plat_chip_disable(struct kim_data_s *data)
 {
-	pr_info("plat_chip_disable\n");
+	pr_info("%s\n", __func__);
 	bluetooth_power(0);
 	wake_unlock(&st_wk_lock);
+	pr_info("%s: done\n", __func__);
 	return 1;
+}
+
+static unsigned long retry_suspend;
+
+int plat_kim_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	struct kim_data_s *kim_gdata;
+	struct st_data_s *core_data;
+	pr_info("%s\n", __func__);
+	kim_gdata = dev_get_drvdata(&pdev->dev);
+	core_data = kim_gdata->core_data;
+	if (st_ll_getstate(core_data) != ST_LL_INVALID) {
+		/* Prevent suspend until sleep indication from chip */
+		while (st_ll_getstate(core_data) != ST_LL_ASLEEP &&
+			(retry_suspend++ < 5)) {
+			pr_err("%s: fail\n", __func__);
+			return -1;
+		}
+	}
+	pr_info("%s: ok\n", __func__);
+	return 0;
+}
+
+int plat_kim_resume(struct platform_device *pdev)
+{
+	pr_info("%s\n", __func__);
+	retry_suspend = 0;
+	return 0;
 }
 
 /* wl128x BT, FM, GPS connectivity chip */
@@ -5348,6 +5378,8 @@ static struct ti_st_plat_data wilink_pdata = {
 	.baud_rate = 3000000,
 	.chip_enable = plat_chip_enable,
 	.chip_disable = plat_chip_disable,
+	.suspend = plat_kim_suspend,
+	.resume = plat_kim_resume,
 };
 
 static struct platform_device btwilink_device = {
