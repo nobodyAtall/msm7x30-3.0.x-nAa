@@ -483,10 +483,6 @@ config MACH_SEMC_MOGAMI
 config MACH_SEMC_SMULTRON
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default y
 	bool "SonyEricsson Smultron"
@@ -496,10 +492,6 @@ config MACH_SEMC_SMULTRON
 config MACH_SEMC_MANGO
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default n
 	bool "SonyEricsson Mango"
@@ -509,10 +501,6 @@ config MACH_SEMC_MANGO
 config MACH_SEMC_COCONUT
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default n
 	bool "SonyEricsson Coconut"
@@ -523,10 +511,6 @@ config MACH_SEMC_HAIDA
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
 	select FB_MSM_HDPI
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default y
 	bool "SonyEricsson Haida"
@@ -537,10 +521,6 @@ config MACH_SEMC_URUSHI
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
 	select FB_MSM_HDPI
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default y
 	bool "SonyEricsson Urushi"
@@ -551,9 +531,6 @@ config MACH_SEMC_ANZU
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
 	select FB_MSM_HDPI
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default y
 	bool "SonyEricsson Anzu"
@@ -562,12 +539,8 @@ config MACH_SEMC_ANZU
 
 config MACH_SEMC_IYOKAN
 	depends on ARCH_MSM7X30
-	select FB_MSM_HDPI
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	depends on !MSM_STACKED_MEMORY
+	select FB_MSM_HDPI
 	select SUPPORT_ALIEN_USB_CHARGER
 	default y
 	bool "SonyEricsson Iyokan"
@@ -578,10 +551,6 @@ config MACH_SEMC_HALLON
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
 	select FB_MSM_HDPI
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default y
 	bool "SonyEricsson Hallon"
@@ -591,10 +560,6 @@ config MACH_SEMC_HALLON
 config MACH_SEMC_SATSUMA
 	depends on ARCH_MSM7X30
 	depends on !MSM_STACKED_MEMORY
-	select MSM_UNDERVOLT_LCD
-	select MSM_UNDERVOLT_PROXIMITY
-	select MSM_UNDERVOLT_WIFI
-	select MSM_UNDERVOLT_TOUCH
 	select SUPPORT_ALIEN_USB_CHARGER
 	default y
 	bool "SonyEricsson Satsuma"
