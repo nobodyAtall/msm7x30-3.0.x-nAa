@@ -616,9 +616,10 @@ static void read_completed(struct urb *urb)
 {
 	struct snd_usb_caiaq_cb_info *info = urb->context;
 	struct snd_usb_caiaqdev *dev;
-	struct urb *out = NULL;
-	int i, frame, len, send_it = 0, outframe = 0;
-	size_t offset = 0;
+
+	size_t truct urb *out = NULL;
+        int i, frame, len, send_it = 0, outframe = 0;
+        size_t offset = 0;
 
 	if (urb->status || !info)
 		return;
@@ -639,6 +640,7 @@ static void read_completed(struct urb *urb)
 		log("Unable to find an output urb to use\n");
 		goto requeue;
 	}
+
 
 	/* read the recently received packet and send back one which has
 	 * the same layout */

@@ -88,11 +88,11 @@ ENTRY(xen_iret)
 	 */
 #ifdef CONFIG_SMP
 	GET_THREAD_INFO(%eax)
-	movl TI_cpu(%eax), %eax
-	movl __per_cpu_offset(,%eax,4), %eax
-	mov xen_vcpu(%eax), %eax
+	movl %ss:TI_cpu(%eax), %eax
+	movl %ss:__per_cpu_offset(,%eax,4), %eax
+	mov %ss:xen_vcpu(%eax), %eax
 #else
-	movl xen_vcpu, %eax
+	movl %ss:xen_vcpu, %eax
 #endif
 
 	/* check IF state we're restoring */
