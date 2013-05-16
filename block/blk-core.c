@@ -431,6 +431,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	q->backing_dev_info.state = 0;
 	q->backing_dev_info.capabilities = BDI_CAP_MAP_COPY;
 	q->backing_dev_info.name = "block";
+        q->node = node_id;
 
 	err = bdi_init(&q->backing_dev_info);
 	if (err) {
@@ -509,25 +510,55 @@ EXPORT_SYMBOL(blk_init_queue);
 struct request_queue *
 blk_init_queue_node(request_fn_proc *rfn, spinlock_t *lock, int node_id)
 {
-	struct request_queue *uninit_q, *q;
+        struct request_queue *uninit_q, *q;
 
-	uninit_q = blk_alloc_queue_node(GFP_KERNEL, node_id);
-	if (!uninit_q)
-		return NULL;
+        uninit_q = blk_alloc_queue_node(GFP_KERNEL, node_id);
+        if (!uninit_q)
+                return NULL;
 
-	q = blk_init_allocated_queue_node(uninit_q, rfn, lock, node_id);
-	if (!q)
-		blk_cleanup_queue(uninit_q);
+        q = blk_init_allocated_queue(uninit_q, rfn, lock);
+        if (!q)
+                blk_cleanup_queue(uninit_q);
 
-	return q;
+        return q;
 }
 EXPORT_SYMBOL(blk_init_queue_node);
 
 struct request_queue *
 blk_init_allocated_queue(struct request_queue *q, request_fn_proc *rfn,
-			 spinlock_t *lock)
+                         spinlock_t *lock)
 {
-	return blk_init_allocated_queue_node(q, rfn, lock, -1);
+        if (!q)
+                return NULL;
+
+        if (blk_init_free_list(q))
+                return NULL;
+
+        q->request_fn           = rfn;
+        q->prep_rq_fn           = NULL;
+        q->unprep_rq_fn         = NULL;
+        q->queue_flags          = QUEUE_FLAG_DEFAULT;
+
+        /* Override internal queue lock with supplied lock pointer */
+        if (lock)
+                q->queue_lock           = lock;
+
+        /*
+         * This also sets hw/phys segments, boundary and size
+         */
+        blk_queue_make_request(q, __make_request);
+
+        q->sg_reserved_size = INT_MAX;
+
+        /*
+         * all done
+         */
+        if (!elevator_init(q, NULL)) {
+                blk_queue_congestion_threshold(q);
+                return q;
+        }
+
+        return NULL;
 }
 EXPORT_SYMBOL(blk_init_allocated_queue);
 

@@ -309,6 +309,9 @@ static int mmc_read_switch(struct mmc_card *card)
 	if (status[13] & 0x02)
 		card->sw_caps.hs_max_dtr = 50000000;
 
+	if (status[13] & UHS_SDR50_BUS_SPEED)
+		card->sw_caps.hs_max_dtr = 50000000;
+
 	if (card->scr.sda_spec3) {
 		card->sw_caps.sd3_bus_mode = status[13];
 
@@ -1093,6 +1096,7 @@ static void mmc_sd_detect(struct mmc_host *host)
 
 		mmc_claim_host(host);
 		mmc_detach_bus(host);
+		mmc_power_off(host);
 		mmc_release_host(host);
 	}
 }

@@ -106,8 +106,10 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 	int retval = -ENODEV;
 	__u8 nintf;
 	__u8 ifnum;
+	bool is_gobi1k = id->driver_info ? true : false;
 
 	dbg("%s", __func__);
+	dbg("Is Gobi 1000 = %d", is_gobi1k);
 
 	nintf = serial->dev->actconfig->desc.bNumInterfaces;
 	dbg("Num Interfaces = %d", nintf);
@@ -155,15 +157,25 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 
 	case 3:
 	case 4:
-		/* Composite mode */
-		/* ifnum == 0 is a broadband network adapter */
-		if (ifnum == 1) {
-			/*
-			 * Diagnostics Monitor (serial line 9600 8N1)
-			 * Qualcomm DM protocol
-			 * use "libqcdm" (ModemManager) for communication
-			 */
-			dbg("Diagnostics Monitor found");
+		/* Composite mode; don't bind to the QMI/net interface as that
+		 * gets handled by other drivers.
+		 */
+
+		/* Gobi 1K USB layout:
+		 * 0: serial port (doesn't respond)
+		 * 1: serial port (doesn't respond)
+		 * 2: AT-capable modem port
+		 * 3: QMI/net
+		 *
+		 * Gobi 2K+ USB layout:
+		 * 0: QMI/net
+		 * 1: DM/DIAG (use libqcdm from ModemManager for communication)
+		 * 2: AT-capable modem port
+		 * 3: NMEA
+		 */
+
+		if (ifnum == 1 && !is_gobi1k) {
+			dbg("Gobi 2K+ DM/DIAG interface found");
 			retval = usb_set_interface(serial->dev, ifnum, 0);
 			if (retval < 0) {
 				dev_err(&serial->dev->dev,
@@ -182,13 +194,13 @@ static int qcprobe(struct usb_serial *serial, const struct usb_device_id *id)
 				retval = -ENODEV;
 				kfree(data);
 			}
-		} else if (ifnum==3) {
+		} else if (ifnum==3 && !is_gobi1k) {
 			/*
 			 * NMEA (serial line 9600 8N1)
 			 * # echo "\$GPS_START" > /dev/ttyUSBx
 			 * # echo "\$GPS_STOP"  > /dev/ttyUSBx
 			 */
-			dbg("NMEA GPS interface found");
+			dbg("Gobi 2K+ NMEA GPS interface found");
 			retval = usb_set_interface(serial->dev, ifnum, 0);
 			if (retval < 0) {
 				dev_err(&serial->dev->dev,

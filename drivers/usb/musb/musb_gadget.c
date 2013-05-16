@@ -576,6 +576,15 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 
 		if (request->actual == request->length) {
 			musb_g_giveback(musb_ep, request, 0);
+			/*
+			 * In the giveback function the MUSB lock is
+			 * released and acquired after sometime. During
+			 * this time period the INDEX register could get
+			 * changed by the gadget_queue function especially
+			 * on SMP systems. Reselect the INDEX to be sure
+			 * we are reading/modifying the right registers
+			 */
+			musb_ep_select(mbase, epnum);
 			req = musb_ep->desc ? next_request(musb_ep) : NULL;
 			if (!req) {
 				dev_dbg(musb->controller, "%s idle now\n",
@@ -968,6 +977,15 @@ void musb_g_rx(struct musb *musb, u8 epnum)
 		}
 #endif
 		musb_g_giveback(musb_ep, request, 0);
+		/*
+		 * In the giveback function the MUSB lock is
+		 * released and acquired after sometime. During
+		 * this time period the INDEX register could get
+		 * changed by the gadget_queue function especially
+		 * on SMP systems. Reselect the INDEX to be sure
+		 * we are reading/modifying the right registers
+		 */
+		musb_ep_select(mbase, epnum);
 
 		req = next_request(musb_ep);
 		if (!req)
@@ -1697,6 +1715,8 @@ static int musb_gadget_pullup(struct usb_gadget *gadget, int is_on)
 	unsigned long	flags;
 
 	is_on = !!is_on;
+
+	pm_runtime_get_sync(musb->controller);
 
 	pm_runtime_get_sync(musb->controller);
 

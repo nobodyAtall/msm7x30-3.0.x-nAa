@@ -2078,8 +2078,6 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
 	if (status < 0)
 		goto fail3;
 
-	pm_runtime_put(musb->controller);
-
 	status = musb_init_debugfs(musb);
 	if (status < 0)
 		goto fail4;
@@ -2259,6 +2257,7 @@ static void musb_save_context(struct musb *musb)
 				musb_read_rxhubport(musb_base, i);
 		}
 	}
+	musb_writeb(musb_base, MUSB_INDEX, musb->context.index);
 }
 
 static void musb_restore_context(struct musb *musb)

@@ -217,6 +217,11 @@ resume:
 			goto drop_unlock;
 		}
 
+		if (async && x->repl->recheck(x, skb, seq)) {
+			XFRM_INC_STATS(net, LINUX_MIB_XFRMINSTATESEQERROR);
+			goto drop_unlock;
+		}
+
 		x->repl->advance(x, seq);
 
 		x->curlft.bytes += skb->len;

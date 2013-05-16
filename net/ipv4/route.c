@@ -91,6 +91,7 @@
 #include <linux/rcupdate.h>
 #include <linux/times.h>
 #include <linux/slab.h>
+#include <linux/prefetch.h>
 #include <net/dst.h>
 #include <net/net_namespace.h>
 #include <net/protocol.h>
@@ -263,6 +264,7 @@ struct rt_hash_bucket {
 #  define RT_HASH_LOCK_SZ	256
 # endif
 #endif
+#include <net/secure_seq.h>
 
 static spinlock_t	*rt_hash_locks;
 # define rt_hash_lock_addr(slot) &rt_hash_locks[(slot) & (RT_HASH_LOCK_SZ - 1)]
@@ -740,6 +742,9 @@ static inline int rt_is_expired(struct rtable *rth)
 	return rth->rt_genid != rt_genid(dev_net(rth->dst.dev));
 }
 
+static struct delayed_work expires_work;
+static unsigned long expires_ljiffies;
+
 /*
  * Perform a full scan of hash table and free all entries.
  * Can be called by a softirq or a process.
@@ -819,6 +824,97 @@ static int has_noalias(const struct rtable *head, const struct rtable *rth)
 		aux = rcu_dereference_protected(aux->dst.rt_next, 1);
 	}
 	return ONE;
+}
+
+static void rt_check_expire(void)
+{
+	static unsigned int rover;
+	unsigned int i = rover, goal;
+	struct rtable *rth;
+	struct rtable __rcu **rthp;
+	unsigned long samples = 0;
+	unsigned long sum = 0, sum2 = 0;
+	unsigned long delta;
+	u64 mult;
+
+	delta = jiffies - expires_ljiffies;
+	expires_ljiffies = jiffies;
+	mult = ((u64)delta) << rt_hash_log;
+	if (ip_rt_gc_timeout > 1)
+		do_div(mult, ip_rt_gc_timeout);
+	goal = (unsigned int)mult;
+	if (goal > rt_hash_mask)
+		goal = rt_hash_mask + 1;
+	for (; goal > 0; goal--) {
+		unsigned long tmo = ip_rt_gc_timeout;
+		unsigned long length;
+
+		i = (i + 1) & rt_hash_mask;
+		rthp = &rt_hash_table[i].chain;
+
+		if (need_resched())
+			cond_resched();
+
+		samples++;
+
+		if (rcu_dereference_raw(*rthp) == NULL)
+			continue;
+		length = 0;
+		spin_lock_bh(rt_hash_lock_addr(i));
+		while ((rth = rcu_dereference_protected(*rthp,
+					lockdep_is_held(rt_hash_lock_addr(i)))) != NULL) {
+			prefetch(rth->dst.rt_next);
+			if (rt_is_expired(rth)) {
+				*rthp = rth->dst.rt_next;
+				rt_free(rth);
+				continue;
+			}
+			if (rth->dst.expires) {
+				/* Entry is expired even if it is in use */
+				if (time_before_eq(jiffies, rth->dst.expires)) {
+nofree:
+					tmo >>= 1;
+					rthp = &rth->dst.rt_next;
+					/*
+					 * We only count entries on
+					 * a chain with equal hash inputs once
+					 * so that entries for different QOS
+					 * levels, and other non-hash input
+					 * attributes don't unfairly skew
+					 * the length computation
+					 */
+					length += has_noalias(rt_hash_table[i].chain, rth);
+					continue;
+				}
+			} else if (!rt_may_expire(rth, tmo, ip_rt_gc_timeout))
+				goto nofree;
+
+			/* Cleanup aged off entries. */
+			*rthp = rth->dst.rt_next;
+			rt_free(rth);
+		}
+		spin_unlock_bh(rt_hash_lock_addr(i));
+		sum += length;
+		sum2 += length*length;
+	}
+	if (samples) {
+		unsigned long avg = sum / samples;
+		unsigned long sd = int_sqrt(sum2 / samples - avg*avg);
+		rt_chain_length_max = max_t(unsigned long,
+					ip_rt_gc_elasticity,
+					(avg + 4*sd) >> FRACT_BITS);
+	}
+	rover = i;
+}
+
+/*
+ * rt_worker_func() is run in process context.
+ * we call rt_check_expire() to scan part of the hash table
+ */
+static void rt_worker_func(struct work_struct *work)
+{
+	rt_check_expire();
+	schedule_delayed_work(&expires_work, ip_rt_gc_interval);
 }
 
 /*
@@ -1269,11 +1365,45 @@ static void rt_del(unsigned hash, struct rtable *rt)
 	spin_unlock_bh(rt_hash_lock_addr(hash));
 }
 
+static int check_peer_redir(struct dst_entry *dst, struct inet_peer *peer)
+{
+	struct rtable *rt = (struct rtable *) dst;
+	__be32 orig_gw = rt->rt_gateway;
+	struct neighbour *n, *old_n;
+	struct hh_cache *old_hh;
+
+	dst_confirm(&rt->dst);
+
+	rt->rt_gateway = peer->redirect_learned.a4;
+	n = __arp_bind_neighbour(&rt->dst, rt->rt_gateway);
+	if (IS_ERR(n))
+		return PTR_ERR(n);
+	old_hh = xchg(&rt->dst.hh, NULL);
+	if (old_hh)
+		hh_cache_put(old_hh);
+	old_n = xchg(&rt->dst._neighbour, n);
+	if (old_n)
+		neigh_release(old_n);
+	if (!n || !(n->nud_state & NUD_VALID)) {
+		if (n)
+			neigh_event_send(n, NULL);
+		rt->rt_gateway = orig_gw;
+		return -EAGAIN;
+	} else {
+		rt->rt_flags |= RTCF_REDIRECTED;
+		call_netevent_notifiers(NETEVENT_NEIGH_UPDATE, n);
+	}
+	return 0;
+}
+
 /* called in rcu_read_lock() section */
 void ip_rt_redirect(__be32 old_gw, __be32 daddr, __be32 new_gw,
 		    __be32 saddr, struct net_device *dev)
 {
+	int s, i;
 	struct in_device *in_dev = __in_dev_get_rcu(dev);
+	__be32 skeys[2] = { saddr, 0 };
+	int    ikeys[2] = { dev->ifindex, 0 };
 	struct inet_peer *peer;
 	struct net *net;
 
@@ -1296,13 +1426,43 @@ void ip_rt_redirect(__be32 old_gw, __be32 daddr, __be32 new_gw,
 			goto reject_redirect;
 	}
 
-	peer = inet_getpeer_v4(daddr, 1);
-	if (peer) {
-		peer->redirect_learned.a4 = new_gw;
+	for (s = 0; s < 2; s++) {
+		for (i = 0; i < 2; i++) {
+			unsigned int hash;
+			struct rtable __rcu **rthp;
+			struct rtable *rt;
 
-		inet_putpeer(peer);
+			hash = rt_hash(daddr, skeys[s], ikeys[i], rt_genid(net));
 
-		atomic_inc(&__rt_peer_genid);
+			rthp = &rt_hash_table[hash].chain;
+
+			while ((rt = rcu_dereference(*rthp)) != NULL) {
+				rthp = &rt->dst.rt_next;
+
+				if (rt->rt_key_dst != daddr ||
+				    rt->rt_key_src != skeys[s] ||
+				    rt->rt_oif != ikeys[i] ||
+				    rt_is_input_route(rt) ||
+				    rt_is_expired(rt) ||
+				    !net_eq(dev_net(rt->dst.dev), net) ||
+				    rt->dst.error ||
+				    rt->dst.dev != dev ||
+				    rt->rt_gateway != old_gw)
+					continue;
+
+				if (!rt->peer)
+					rt_bind_peer(rt, rt->rt_dst, 1);
+
+				peer = rt->peer;
+				if (peer) {
+					if (peer->redirect_learned.a4 != new_gw) {
+						peer->redirect_learned.a4 = new_gw;
+						atomic_inc(&__rt_peer_genid);
+					}
+					check_peer_redir(&rt->dst, peer);
+				}
+			}
+		}
 	}
 	return;
 
@@ -1587,31 +1747,6 @@ static void ip_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 		}
 		check_peer_pmtu(dst, peer);
 	}
-}
-
-static int check_peer_redir(struct dst_entry *dst, struct inet_peer *peer)
-{
-	struct rtable *rt = (struct rtable *) dst;
-	__be32 orig_gw = rt->rt_gateway;
-
-	dst_confirm(&rt->dst);
-
-	neigh_release(rt->dst.neighbour);
-	rt->dst.neighbour = NULL;
-
-	rt->rt_gateway = peer->redirect_learned.a4;
-	if (arp_bind_neighbour(&rt->dst) ||
-	    !(rt->dst.neighbour->nud_state & NUD_VALID)) {
-		if (rt->dst.neighbour)
-			neigh_event_send(rt->dst.neighbour, NULL);
-		rt->rt_gateway = orig_gw;
-		return -EAGAIN;
-	} else {
-		rt->rt_flags |= RTCF_REDIRECTED;
-		call_netevent_notifiers(NETEVENT_NEIGH_UPDATE,
-					rt->dst.neighbour);
-	}
-	return 0;
 }
 
 static struct dst_entry *ipv4_dst_check(struct dst_entry *dst, u32 cookie)
@@ -3088,6 +3223,13 @@ static ctl_table ipv4_route_table[] = {
 		.proc_handler	= proc_dointvec_jiffies,
 	},
 	{
+		.procname	= "gc_interval",
+		.data		= &ip_rt_gc_interval,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= proc_dointvec_jiffies,
+	},
+	{
 		.procname	= "redirect_load",
 		.data		= &ip_rt_redirect_load,
 		.maxlen		= sizeof(int),
@@ -3297,13 +3439,18 @@ int __init ip_rt_init(void)
 	devinet_init();
 	ip_fib_init();
 
+	INIT_DELAYED_WORK_DEFERRABLE(&expires_work, rt_worker_func);
+	expires_ljiffies = jiffies;
+	schedule_delayed_work(&expires_work,
+		net_random() % ip_rt_gc_interval + ip_rt_gc_interval);
+
 	if (ip_rt_proc_init())
 		printk(KERN_ERR "Unable to create route proc files\n");
 #ifdef CONFIG_XFRM
 	xfrm_init();
 	xfrm4_init(ip_rt_max_size);
 #endif
-	rtnl_register(PF_INET, RTM_GETROUTE, inet_rtm_getroute, NULL);
+	rtnl_register(PF_INET, RTM_GETROUTE, inet_rtm_getroute, NULL, NULL);
 
 #ifdef CONFIG_SYSCTL
 	register_pernet_subsys(&sysctl_route_ops);

@@ -15,6 +15,7 @@
 #include <asm/e820.h>
 #include <asm/setup.h>
 #include <asm/acpi.h>
+#include <asm/numa.h>
 #include <asm/xen/hypervisor.h>
 #include <asm/xen/hypercall.h>
 
@@ -314,6 +315,14 @@ char * __init xen_memory_setup(void)
 			extra_pages = 0;
 	}
 
+	extra_limit = xen_get_max_pages();
+	if (max_pfn + extra_pages > extra_limit) {
+		if (extra_limit > max_pfn)
+			extra_pages = extra_limit - max_pfn;
+		else
+			extra_pages = 0;
+	}
+
 	extra_pages += xen_return_unused_memory(xen_start_info->nr_pages, &e820);
 
 	/*
@@ -451,4 +460,7 @@ void __init xen_arch_setup(void)
 	boot_option_idle_override = IDLE_HALT;
 
 	fiddle_vdso();
+#ifdef CONFIG_NUMA
+	numa_off = 1;
+#endif
 }

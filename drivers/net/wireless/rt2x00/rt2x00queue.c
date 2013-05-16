@@ -681,7 +681,9 @@ int rt2x00queue_clear_beacon(struct rt2x00_dev *rt2x00dev,
 
 	mutex_unlock(&intf->beacon_skb_mutex);
 
-	return 0;
+out:
+	spin_unlock(&queue->tx_lock);
+	return ret;
 }
 
 int rt2x00queue_update_beacon_locked(struct rt2x00_dev *rt2x00dev,
